@@ -74,32 +74,8 @@ main{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,1fr);gap:1
 .chip i{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:0 0 6px currentColor}
 .chip.depf{background:var(--ink);color:var(--bg);font-weight:600}
 .chip:focus-visible,.btn:focus-visible,a:focus-visible,.marker:focus-visible,select:focus-visible,input:focus-visible,.item:focus-visible,#feed .it:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-svg#map{width:100%;height:auto;display:block;max-height:74vh;position:relative;touch-action:pan-y;user-select:none;-webkit-user-select:none}
-svg#map:focus{outline:none}svg#map:focus-visible{outline:2px solid var(--focus)}
-svg#map.grab{cursor:grab}svg#map.grabbing{cursor:grabbing}
-.zoomctl{position:absolute;right:8px;bottom:8px;display:flex;flex-direction:column;gap:6px;z-index:1}
-.zoomctl button{width:38px;height:38px;border-radius:8px;border:1px solid var(--line2);background:rgba(11,19,32,.85);backdrop-filter:blur(6px);color:var(--ink);font:700 20px var(--cond);cursor:pointer;display:grid;place-items:center}
-.zoomctl button:hover{border-color:var(--muted)}
-.zoomctl button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.zoomctl span{font:600 12px var(--body);color:var(--muted);text-align:center}
-.dept{fill:var(--land);stroke:var(--landline);stroke-width:.7;vector-effect:non-scaling-stroke;stroke-linejoin:round;transition:fill .5s;cursor:pointer}
-.under{fill:var(--land);stroke:var(--land);stroke-width:2.5;vector-effect:non-scaling-stroke;stroke-linejoin:round}
-.clbl{font:600 11px var(--body);fill:#C9D6E6;paint-order:stroke;stroke:#0B1320;stroke-width:3px;stroke-linejoin:round;letter-spacing:.02em}
-.clbl.big{font:700 13px var(--cond);letter-spacing:.06em;text-transform:uppercase;fill:#E9EFF6}
-.cdot{fill:#C9D6E6;stroke:#0B1320;stroke-width:1px;vector-effect:non-scaling-stroke}
-.dlbl{font:700 12px var(--cond);fill:rgba(233,239,246,.32);letter-spacing:.12em;text-transform:uppercase;text-anchor:middle}
-.dept:hover{fill:var(--landhi);stroke:#5C7A9E;stroke-width:1.2}
-.dept.sel{stroke:var(--ink);stroke-width:2}
-.marker{cursor:pointer}
-.marker .core{stroke:#0B1320;stroke-width:1.5;vector-effect:non-scaling-stroke}
-.marker .halo{opacity:.35}
-.marker.sel .core{stroke:#fff;stroke-width:2.5}
-.marker.old{opacity:.5}
 .pulse{fill:none;stroke-width:1.6;transform-box:fill-box;transform-origin:center;animation:pulse 2.4s ease-out infinite}
 @keyframes pulse{from{transform:scale(1);opacity:.9}to{transform:scale(3.4);opacity:0}}
-.streak{stroke-linecap:round;fill:none}
-#tip{position:absolute;pointer-events:none;background:#07101B;border:1px solid var(--line2);color:var(--ink);font-size:12.5px;padding:5px 9px;border-radius:5px;display:none;white-space:nowrap;z-index:3}
-.mapbox{position:relative}
 .legend{position:absolute;left:8px;bottom:8px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px;background:rgba(11,19,32,.82);backdrop-filter:blur(6px);padding:9px 11px;border:1px solid var(--line);border-radius:8px;z-index:1}
 .legend span{display:flex;align-items:center;gap:7px}
 .legend i{width:9px;height:9px;border-radius:50%;box-shadow:0 0 6px currentColor}
@@ -199,7 +175,66 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
   .pulse{opacity:0}
   .ticker .track{animation:none;position:static;overflow:auto}
 }
+
+/* ---------- Carte détaillée (Leaflet) ---------- */
+.mapbox{position:relative;margin-top:8px}
+#lmap{height:min(72vh,780px);min-height:420px;border-radius:8px;background:#0B1320;border:1px solid var(--line)}
+.leaflet-container{background:#0B1320;font-family:var(--body)}
+.leaflet-bar{border:1px solid var(--line2)!important;box-shadow:none!important}
+.leaflet-bar a{background:rgba(11,19,32,.9)!important;color:var(--ink)!important;border-bottom-color:var(--line2)!important;width:36px!important;height:36px!important;line-height:36px!important;font:700 20px var(--cond)!important}
+.leaflet-bar a:hover{background:var(--panel2)!important}
+.leaflet-control-attribution{background:rgba(11,19,32,.75)!important;color:var(--muted)!important;font-size:10.5px}
+.leaflet-control-attribution a{color:#9CC8FF!important}
+.leaflet-tooltip.dtip{background:#07101B;border:1px solid var(--line2);color:var(--ink);font:500 12.5px var(--body);box-shadow:0 6px 18px rgba(0,0,0,.4);border-radius:5px}
+.leaflet-tooltip.dtip::before{display:none}
+.leaflet-interactive.depsel{stroke:#fff}
+/* points d'incidents */
+.mk{position:relative}
+.mk i{position:absolute;inset:0;border-radius:50%;background:var(--c);box-shadow:0 0 0 1.5px #0B1320,0 0 12px 3px color-mix(in srgb,var(--c) 65%,transparent)}
+.mk.fresh::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--c);animation:ring 2.4s ease-out infinite}
+.mk.old{opacity:.5}
+.mk.sel i{box-shadow:0 0 0 2.5px #fff,0 0 18px 5px color-mix(in srgb,var(--c) 70%,transparent)}
+.mk.drop i{animation:drop .8s cubic-bezier(.2,.9,.3,1.25)}
+.mk.drop::before{content:"";position:absolute;left:50%;bottom:50%;width:2px;height:120px;margin-left:-1px;background:linear-gradient(to top,var(--c),transparent);filter:drop-shadow(0 0 4px var(--c));animation:streak .8s ease-out forwards;transform-origin:bottom}
+@keyframes ring{from{transform:scale(1);opacity:.9}to{transform:scale(3.4);opacity:0}}
+@keyframes drop{0%{transform:translateY(-60px) scale(.3);opacity:0}70%{opacity:1}100%{transform:none}}
+@keyframes streak{0%{transform:scaleY(1);opacity:1}100%{transform:scaleY(0);opacity:0}}
+/* en cours : manifs et interventions */
+.lv{display:flex;align-items:center;gap:5px;white-space:nowrap;transform:translate(-9px,-9px)}
+.lv b{flex:none;width:18px;height:18px;border-radius:50%;position:relative;display:grid;place-items:center;font:700 10px var(--body);color:#fff}
+.lv span{font:800 11px var(--cond);letter-spacing:.08em;padding:2px 6px;border-radius:3px;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+.lv-manif b{background:#9B5CFF;box-shadow:0 0 0 2px #0B1320,0 0 16px 4px rgba(155,92,255,.7)}
+.lv-manif b::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid #B88BFF;animation:ring 2s ease-out infinite}
+.lv-manif span{background:#7C3AED}
+.lv-interv b{animation:gyro .9s steps(1) infinite;box-shadow:0 0 0 2px #0B1320}
+.lv-interv span{background:#0E7490}
+@keyframes gyro{0%{background:#FF3B4E;box-shadow:0 0 0 2px #0B1320,0 0 20px 6px rgba(255,59,78,.85)}50%{background:#3B82F6;box-shadow:0 0 0 2px #0B1320,0 0 20px 6px rgba(59,130,246,.85)}}
+.lv.sel span{outline:2px solid #fff}
+.livebar{position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 80px)}
+.livebar button{font:700 13px var(--cond);letter-spacing:.06em;text-transform:uppercase;padding:6px 10px;border-radius:6px;border:1px solid var(--line2);background:rgba(7,16,27,.88);backdrop-filter:blur(6px);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.livebar button[aria-pressed="false"]{opacity:.5}
+.livebar .dotm{width:9px;height:9px;border-radius:50%;background:#9B5CFF;box-shadow:0 0 8px #9B5CFF}
+.livebar .doti{width:9px;height:9px;border-radius:50%;animation:gyro .9s steps(1) infinite}
+.livebar .zero{opacity:.55}
+.legend{position:absolute;left:10px;bottom:24px;z-index:1000;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px;background:rgba(11,19,32,.85);backdrop-filter:blur(6px);padding:9px 11px;border:1px solid var(--line);border-radius:8px}
+#detail{z-index:1100}
+/* section en cours dans le fil */
+#liveList{list-style:none;margin:0 8px 6px;padding:0;border:1px solid color-mix(in srgb,#9B5CFF 40%,var(--line));border-radius:8px;background:rgba(124,58,237,.07)}
+#liveList:empty{display:none}
+#liveList li+li{border-top:1px solid var(--line)}
+#liveList button{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:auto 1fr;gap:10px;width:100%;padding:9px 10px;font-size:14px;line-height:1.3}
+#liveList button:hover{background:rgba(255,255,255,.04)}
+#liveList button:focus-visible{outline:2px solid var(--focus)}
+#liveList .tag{font:800 11px var(--cond);letter-spacing:.08em;padding:2px 6px;border-radius:3px;color:#fff;height:fit-content;margin-top:1px}
+#liveList small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.liveh{font:700 13px var(--cond);letter-spacing:.1em;color:#C4A5FF;padding:2px 18px 6px;display:flex;align-items:center;gap:8px}
+.liveh i{width:8px;height:8px;border-radius:50%;background:#9B5CFF;box-shadow:0 0 8px #9B5CFF;animation:blink 1.4s infinite}
+@media (max-width:620px){#lmap{height:62vh;min-height:360px}.legend{position:static;margin-top:8px;flex-direction:row;flex-wrap:wrap;gap:4px 12px}}
+@media (prefers-reduced-motion:reduce){.mk.fresh::after,.lv-manif b::after,.lv-interv b,.livebar .doti,.liveh i{animation:none}.mk.drop i,.mk.drop::before{animation:none}.mk.drop::before{display:none}}
+
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
 <body>
 <div class="ticker" aria-label="Derniers faits graves">
@@ -208,7 +243,7 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
 </div>
 
 <header>
-  <h1>Veille France<small>Incidents graves en direct, mis à jour par un robot toutes les 10 minutes</small></h1>
+  <h1>Veille France<small>Incidents graves, manifestations et interventions en direct</small></h1>
   <div class="status" id="status">Chargement…</div>
   <div class="tools">
     <span id="clock"></span>
@@ -222,28 +257,9 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
   <section class="panel mapwrap" aria-label="Carte des incidents">
     <div class="filters" id="filters"></div>
     <div class="mapbox">
-    <svg id="map" role="img" aria-label="Carte de France par département">
-      <defs>
-        <filter id="relief" x="-10%" y="-10%" width="120%" height="125%">
-          <feGaussianBlur id="relBlur" in="SourceAlpha" stdDeviation="6" result="b"/>
-          <feOffset id="relOff" dy="9" result="o"/>
-          <feFlood flood-color="#000" flood-opacity=".65"/>
-          <feComposite in2="o" operator="in" result="s"/>
-          <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <filter id="glow" x="-200%" y="-200%" width="500%" height="500%">
-          <feGaussianBlur stdDeviation="3.2" result="g"/>
-          <feMerge><feMergeNode in="g"/><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <linearGradient id="sheen" x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0" stop-color="#fff" stop-opacity=".07"/>
-          <stop offset=".6" stop-color="#fff" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-    </svg>
-    <div id="tip"></div>
-    <div class="legend" id="legend"></div>
-    <div class="zoomctl"><button id="zIn" aria-label="Zoomer">+</button><button id="zOut" aria-label="Dézoomer">−</button><button id="zReset" aria-label="Vue entière" title="Vue entière">⤢</button><span id="zLbl">×1</span></div>
+      <div id="lmap" aria-label="Carte de France détaillée"></div>
+      <div class="livebar" id="livebar"></div>
+      <div class="legend" id="legend"></div>
     </div>
     <div class="timeline" aria-label="Rejouer les 7 derniers jours">
       <button class="tl-btn" id="playBtn" aria-label="Rejouer">▶</button>
@@ -258,6 +274,8 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
   </section>
   <aside class="panel">
     <h2>Fil des faits <small id="feedCount"></small></h2>
+    <div class="liveh" id="liveH" hidden><i></i>EN COURS</div>
+    <ul id="liveList"></ul>
     <ul id="feed"></ul>
   </aside>
 </main>
@@ -287,13 +305,15 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
   </div>
 </section>
 
-<footer>Un robot relit les flux RSS des journaux toutes les 10 minutes, reconnaît la commune parmi les 35 000 de France, classe la gravité et regroupe les articles qui parlent du même fait. Tout est détecté à partir des mots du titre : un fait peut être mal placé ou mal classé, l'article fait foi. Indice d'intensité : mort = 3 pts, blessés graves ou arme = 2 pts, violences = 1 pt.</footer>
+<footer>Un robot relit les flux RSS des journaux toutes les 5 à 10 minutes, reconnaît la commune parmi les 35 000 de France, classe la gravité, repère les manifestations et interventions signalées comme en cours, et regroupe les articles qui parlent du même fait. « En cours » veut dire signalé par la presse il y a moins de 2 à 4 heures : il n'existe pas de flux officiel en temps réel des interventions, donc un événement peut être déjà terminé. Tout est détecté à partir des mots du titre, l'article fait foi. Fond de carte © OpenStreetMap et CARTO.</footer>
 
 <dialog id="settings">
   <h3>Réglages des alertes</h3>
   <p class="hint">Les alertes du navigateur s'affichent quand cette page est ouverte. Pour les recevoir sur ton téléphone même page fermée, suis la partie « Alertes push » du README.</p>
   <label for="sevSel">M'alerter à partir de</label>
   <select id="sevSel"><option value="crit">Mort(s) uniquement</option><option value="grave">Blessés graves et plus</option><option value="eleve">Toutes les violences</option></select>
+  <label for="liveSel">Manifestations et interventions en cours</label>
+  <select id="liveSel"><option value="0">Ne pas m'alerter</option><option value="interv">M'alerter pour les interventions</option><option value="all">M'alerter pour les manifs et les interventions</option></select>
   <label for="depInp">Départements surveillés</label>
   <input id="depInp" placeholder="ex. 75, 93, 13 (vide = toute la France)">
   <p class="hint">Numéros séparés par des virgules.</p>
@@ -310,144 +330,78 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
 
 <script>
 const SEV={crit:{lbl:"Mort(s)",w:3,c:"var(--crit)",hex:"#FF3B4E"},grave:{lbl:"Blessés graves",w:2,c:"var(--grave)",hex:"#FF9F1C"},eleve:{lbl:"Violences",w:1,c:"var(--eleve)",hex:"#4DA3FF"}};
+const KIND={manif:{lbl:"Manif",long:"Manifestation",hex:"#9B5CFF",win:3},intervention:{lbl:"Intervention",long:"Intervention en cours",hex:"#0E7490",win:2}};
 const PERIODS={6:"6 h",24:"24 h",48:"48 h",168:"7 jours"};
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
-let DATA={events:[],feeds:[],updated:null}, DEPS=[], depByCode={};
+let DATA={events:[],feeds:[],updated:null}, depByCode={}, depLayers={};
 let period=ls.get("vf_period",24), mode=ls.get("vf_mode","both"), active=new Set(Object.keys(SEV));
+let showLive=ls.get("vf_live",{manif:true,intervention:true});
 let depFilter=null, selected=null, knownIds=null, lastFetch=0, fetchOk=false;
-let alertCfg=ls.get("vf_alerts",{on:false,sev:"crit",deps:[],sound:true});
-let lastVis=[], cursor=null, playing=null, speed=1, shownIds=new Set();   // cursor = null → direct
+let alertCfg=Object.assign({on:false,sev:"crit",deps:[],sound:true,live:"0"},ls.get("vf_alerts",{}));
+let cursor=null, playing=null, speed=1, dropIds=new Set();
 const now=()=>cursor??Date.now();
+const isViol=e=>!!SEV[e.sev];
+const isLive=(e,T=now())=>{if(!e.kind||!KIND[e.kind])return false;const last=e.updated||e.date;const w=(e.ongoing?4:KIND[e.kind].win)*3600e3;return last<=T&&T-last<=w;};
 
-/* ---------- Carte ---------- */
-const K=58,C=Math.cos(46.5*Math.PI/180),PAD=16;
-const px=lon=>PAD+(lon+5.3)*C*K, py=lat=>PAD+(51.15-lat)*K;
-const inMetro=e=>e.lat!=null&&e.lat>41&&e.lat<51.3&&e.lon>-5.5&&e.lon<10;
-const NS="http://www.w3.org/2000/svg", map=document.getElementById("map");
-const VH=Math.round(py(41.3)+PAD+10);
-const VW=Math.round(px(9.7)+PAD);
-map.setAttribute("viewBox",`0 0 ${VW} ${VH}`);
-const el=(n,a,p)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);(p||map).appendChild(e);return e};
-const gLand=el("g",{filter:"url(#relief)"}), gUnder=el("path",{class:"under"},gLand), gDeps=el("g",{},gLand), gSheen=el("g",{"pointer-events":"none"}), gLbl=el("g",{"pointer-events":"none"}), gMk=el("g",{}), gFx=el("g",{"pointer-events":"none"});
-const tip=document.getElementById("tip");
-function drawDeps(){
-  let all="";
-  DEPS.forEach(d=>{
-    const path=d.rings.map(r=>r.map((p,i)=>(i?"L":"M")+px(p[0]).toFixed(2)+","+py(p[1]).toFixed(2)).join("")+"Z").join("");
-    all+=path;
-    const p=el("path",{d:path,class:"dept","data-code":d.code},gDeps);
-    p.addEventListener("mousemove",ev=>{const r=map.parentElement.getBoundingClientRect();tip.style.display="block";tip.style.left=(ev.clientX-r.left+14)+"px";tip.style.top=(ev.clientY-r.top+14)+"px";tip.textContent=`${d.nom} (${d.code}) · ${d._n||0} fait${(d._n||0)>1?"s":""}`;});
-    p.addEventListener("mouseleave",()=>tip.style.display="none");
-    p.addEventListener("click",()=>{if(moved)return;setDep(depFilter===d.code?null:d.code);});
-  });
-  gUnder.setAttribute("d",all);
-  el("path",{d:all,fill:"url(#sheen)"},gSheen);
-  drawLabels();
-}
-function setDep(code){depFilter=code;closeDetail(false);render();code?zoomToDep(code):setVB({x:0,y:0,w:VW,h:VH},true);}
+/* ---------- Carte détaillée ---------- */
+const FR_BOUNDS=[[41.3,-5.3],[51.15,9.65]];
+const map=L.map("lmap",{zoomSnap:.25,zoomDelta:.75,wheelPxPerZoomLevel:90,minZoom:4.5,maxZoom:18,zoomControl:false,attributionControl:true,worldCopyJump:false,maxBounds:[[38,-12],[54,16]],maxBoundsViscosity:.6});
+L.control.zoom({position:"bottomright",zoomInTitle:"Zoomer",zoomOutTitle:"Dézoomer"}).addTo(map);
+const ResetCtl=L.Control.extend({options:{position:"bottomright"},onAdd(){const d=L.DomUtil.create("div","leaflet-bar");const a=L.DomUtil.create("a","",d);a.href="#";a.title="Vue entière";a.setAttribute("role","button");a.setAttribute("aria-label","Vue entière");a.textContent="⤢";L.DomEvent.on(a,"click",ev=>{L.DomEvent.preventDefault(ev);depFilter=null;render();map.flyToBounds(FR_BOUNDS,{duration:.6});});L.DomEvent.disableClickPropagation(d);return d;}});
+new ResetCtl().addTo(map);
+map.fitBounds(FR_BOUNDS);
+map.attributionControl.setPrefix(false);
+map.createPane("labels");map.getPane("labels").style.zIndex=450;map.getPane("labels").style.pointerEvents="none";
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",{subdomains:"abcd",maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",{subdomains:"abcd",maxZoom:19,pane:"labels"}).addTo(map);
+const depGroup=L.geoJSON(null,{style:()=>({color:"#3A5578",weight:1,fillColor:"#17263A",fillOpacity:0}),onEachFeature:(f,layer)=>{
+  const code=f.properties.code;depLayers[code]=layer;
+  layer.bindTooltip(()=>{const n=depByCode[code]?._n||0;return`${f.properties.nom} (${code}) · ${n} fait${n>1?"s":""}`;},{sticky:true,className:"dtip",direction:"top",offset:[0,-8]});
+  layer.on("click",()=>setDep(depFilter===code?null:code));
+  layer.on("mouseover",()=>layer.setStyle({weight:2,color:"#9CC8FF"}));
+  layer.on("mouseout",()=>styleDeps());
+}}).addTo(map);
+const mkGroup=L.layerGroup().addTo(map), liveGroup=L.layerGroup().addTo(map);
+map.on("zoomend",()=>styleDeps());
+function setDep(code){depFilter=code;closeDetail(false);render();
+  if(code&&depLayers[code]) map.flyToBounds(depLayers[code].getBounds(),{padding:[30,30],duration:.6});
+  else map.flyToBounds(FR_BOUNDS,{duration:.6});}
+
 // Couleur de chaleur : terre → braise → rouge
 const lerp=(a,b,t)=>a.map((v,i)=>Math.round(v+(b[i]-v)*t));
 const LAND=[23,38,58],EMBER=[255,107,44],RED=[255,59,78];
 const heat=t=>{const c=t<.5?lerp(LAND,EMBER,.25+t*1.3):lerp(EMBER,RED,(t-.5)*2);return`rgb(${c})`;};
-
-// Traînée lumineuse : un trait tombe du haut vers le point puis une onde s'ouvre
-function streak(e){
-  if(reduced||!inMetro(e)) return;
-  const x=px(e.lon),y=py(e.lat),c=SEV[e.sev].hex,x0=x-60/zoom,y0=y-170/zoom;
-  const id="g"+Math.random().toString(36).slice(2);
-  const grad=el("linearGradient",{id,x1:x0,y1:y0,x2:x,y2:y,gradientUnits:"userSpaceOnUse"},map.querySelector("defs"));
-  el("stop",{offset:"0","stop-color":c,"stop-opacity":"0"},grad);el("stop",{offset:"1","stop-color":c,"stop-opacity":"1"},grad);
-  const len=Math.hypot(x-x0,y-y0);
-  const l=el("path",{d:`M${x0},${y0}L${x},${y}`,class:"streak",stroke:`url(#${id})`,"stroke-width":2.4/zoom,filter:"url(#glow)","stroke-dasharray":`${len} ${len}`,"stroke-dashoffset":len},gFx);
-  l.animate([{strokeDashoffset:len,opacity:1},{strokeDashoffset:0,opacity:1,offset:.55},{strokeDashoffset:-len,opacity:0}],{duration:1100,easing:"cubic-bezier(.3,.6,.3,1)"}).onfinish=()=>{l.remove();grad.remove();};
-  setTimeout(()=>{const ring=el("circle",{cx:x,cy:y,r:4/zoom,fill:"none",stroke:c,"stroke-width":2/zoom,filter:"url(#glow)"},gFx);
-    ring.animate([{r:4/zoom,opacity:1},{r:34/zoom,opacity:0}],{duration:900,easing:"ease-out"}).onfinish=()=>ring.remove();},600);
+let heatScore={},heatMax=4;
+function styleDeps(){
+  const z=map.getZoom(), op=z<7?.62:z<9?.42:z<11?.22:.1;
+  Object.entries(depLayers).forEach(([c,l])=>{const s=heatScore[c]||0,sel=c===depFilter;
+    l.setStyle({color:sel?"#FFFFFF":"#3A5578",weight:sel?2.5:(z<8?.8:1.3),opacity:z<11?.9:.6,fillColor:s?heat(Math.sqrt(s/heatMax)):"#17263A",fillOpacity:mode!=="points"&&s?op:0});});
 }
+function hashJ(id){let h=0;for(const c of id)h=(h*31+c.charCodeAt(0))|0;return[((h&255)/255-.5)*.008,(((h>>8)&255)/255-.5)*.011];}
+const ll=e=>{const[a,b]=hashJ(e.id);return[e.lat+(e.area?0:a),e.lon+(e.area?0:b)];};
+const hasPos=e=>e.lat!=null&&e.lon!=null;
 
-function drawMarkers(){
-  const vis=lastVis; gMk.innerHTML="";
-  if(mode!=="heat") [...vis].filter(inMetro).sort((a,b)=>SEV[a.sev].w-SEV[b.sev].w||a.date-b.date).forEach(e=>{
-    const age=now()-e.date;
-    const g=el("g",{class:"marker"+(selected===e.id?" sel":"")+(age>24*3600e3?" old":""),tabindex:0,role:"button","aria-label":e.title},gMk);
-    const x=px(e.lon),y=py(e.lat),c=SEV[e.sev].hex,r=(3.6+SEV[e.sev].w*1.3+Math.min(4,e.articles.length-1))/Math.pow(zoom,.75);
-    el("circle",{cx:x,cy:y,r:r*2.2,class:"halo",fill:c,filter:"url(#glow)"},g);
-    if(age<3*3600e3) el("circle",{cx:x,cy:y,r,class:"pulse",stroke:c},g);
-    el("circle",{cx:x,cy:y,r,class:"core",fill:c},g);
-    el("title",{},g).textContent=`${e.title} · ${placeLbl(e)}`;
-    g.onclick=ev=>{ev.stopPropagation();if(moved)return;select(e.id);};
-    g.onkeydown=ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();select(e.id);}};
+function drawMarkers(vis){
+  mkGroup.clearLayers();
+  if(mode==="heat") return;
+  const T=now();
+  [...vis].filter(hasPos).sort((a,b)=>SEV[a.sev].w-SEV[b.sev].w||a.date-b.date).forEach(e=>{
+    const age=T-e.date, size=Math.round(11+SEV[e.sev].w*3+Math.min(6,(e.articles.length-1)*2));
+    const cls=["mk",age<3*3600e3?"fresh":"",age>24*3600e3?"old":"",selected===e.id?"sel":"",dropIds.has(e.id)&&!reduced?"drop":""].join(" ");
+    const m=L.marker(ll(e),{icon:L.divIcon({className:"",html:`<div class="${cls}" style="--c:${SEV[e.sev].hex};width:${size}px;height:${size}px"><i></i></div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]}),title:`${e.title} · ${placeLbl(e)}`,keyboard:true,riseOnHover:true,zIndexOffset:SEV[e.sev].w*100});
+    m.on("click",()=>select(e.id));m.addTo(mkGroup);
   });
 }
-
-/* ---------- Noms des villes et départements selon le zoom ---------- */
-const CITIES=[["Paris",48.857,2.352,1],["Marseille",43.296,5.37,1],["Lyon",45.764,4.836,1],["Toulouse",43.605,1.444,1],["Nice",43.71,7.262,1],["Nantes",47.218,-1.554,1],["Montpellier",43.611,3.877,1],["Strasbourg",48.573,7.752,1],["Bordeaux",44.838,-0.579,1],["Lille",50.629,3.057,1],
-["Rennes",48.117,-1.678,2],["Reims",49.258,4.032,2],["Toulon",43.124,5.928,2],["Saint-Étienne",45.44,4.387,2],["Le Havre",49.494,0.108,2],["Grenoble",45.188,5.724,2],["Dijon",47.322,5.041,2],["Angers",47.478,-0.563,2],["Nîmes",43.837,4.36,2],["Clermont-Ferrand",45.778,3.087,2],["Le Mans",48.006,0.199,2],["Aix-en-Provence",43.529,5.447,2],["Brest",48.39,-4.486,2],["Tours",47.394,0.685,2],["Amiens",49.894,2.296,2],["Limoges",45.833,1.262,2],["Perpignan",42.699,2.895,2],["Metz",49.12,6.176,2],["Besançon",47.238,6.024,2],["Orléans",47.903,1.909,2],["Rouen",49.443,1.099,2],["Mulhouse",47.75,7.336,2],["Caen",49.182,-0.371,2],["Nancy",48.692,6.184,2],["Avignon",43.949,4.806,2],["Poitiers",46.58,0.34,2],["Pau",43.295,-0.37,2],["Ajaccio",41.919,8.738,2],["Bastia",42.697,9.45,2],
-["Saint-Denis",48.936,2.357,3],["Argenteuil",48.947,2.248,3],["Montreuil",48.861,2.443,3],["Roubaix",50.69,3.181,3],["Tourcoing",50.724,3.161,3],["Nanterre",48.892,2.207,3],["Créteil",48.79,2.455,3],["Versailles",48.804,2.13,3],["Dunkerque",51.034,2.377,3],["Béziers",43.344,3.216,3],["La Rochelle",46.16,-1.151,3],["Calais",50.951,1.858,3],["Cannes",43.552,7.017,3],["Antibes",43.58,7.125,3],["Colmar",48.079,7.358,3],["Saint-Nazaire",47.273,-2.213,3],["Valence",44.933,4.892,3],["Bourges",47.081,2.399,3],["Quimper",47.996,-4.102,3],["Troyes",48.297,4.074,3],["Lorient",47.748,-3.37,3],["Vannes",47.658,-2.76,3],["Niort",46.323,-0.464,3],["Chambéry",45.564,5.918,3],["Annecy",45.9,6.129,3],["Belfort",47.64,6.863,3],["Bayonne",43.493,-1.475,3],["Agen",44.203,0.616,3],["Albi",43.929,2.148,3],["Arles",43.677,4.63,3],["Cherbourg",49.639,-1.616,3],["Saint-Malo",48.649,-2.026,3],["Angoulême",45.648,0.156,3],["Montauban",44.017,1.355,3],["Chartres",48.446,1.489,3],["Évry",48.629,2.441,3],["Cergy",49.036,2.076,3],["Bobigny",48.909,2.439,3],["Villeurbanne",45.767,4.88,3],["Vénissieux",45.697,4.886,3],["Wattrelos",50.701,3.217,3],["Lens",50.432,2.833,3],["Valenciennes",50.357,3.523,3],["Beauvais",49.43,2.081,3],["Charleville-Mézières",49.773,4.72,3],["Épinal",48.173,6.449,3],["Thionville",49.358,6.168,3],["Carcassonne",43.213,2.351,3],["Narbonne",43.184,3.004,3],["Sète",43.403,3.697,3],["Fréjus",43.433,6.737,3],["Gap",44.56,6.079,3],["Auxerre",47.798,3.567,3],["Mâcon",46.307,4.828,3],["Blois",47.586,1.335,3],["Laval",48.073,-0.77,3],["Saint-Brieuc",48.514,-2.765,3],["Tarbes",43.233,0.078,3],["Périgueux",45.184,0.721,3],["Rodez",44.35,2.575,3]];
-function drawLabels(){
-  gLbl.innerHTML="";
-  const tier=zoom<1.6?1:zoom<3?2:3;
-  if(zoom>=2.4) DEPS.forEach(d=>{const t=el("text",{x:px(d.c[0]),y:py(d.c[1]),class:"dlbl",style:`font-size:${12/zoom}px`},gLbl);t.textContent=d.nom;});
-  CITIES.filter(c=>c[3]<=tier).forEach(([n,la,lo,t])=>{
-    const x=px(lo),y=py(la);
-    if(x<vb.x-20/zoom||x>vb.x+vb.w||y<vb.y||y>vb.y+vb.h+20/zoom) return;
-    el("circle",{cx:x,cy:y,r:2.2/zoom,class:"cdot"},gLbl);
-    const tx=el("text",{x:x+5/zoom,y:y-4/zoom,class:"clbl"+(t===1?" big":""),style:`font-size:${(t===1?13:11)/zoom}px;stroke-width:${3/zoom}px`},gLbl);tx.textContent=n;
+function drawLive(list){
+  liveGroup.clearLayers();
+  list.filter(hasPos).filter(e=>showLive[e.kind]).forEach(e=>{
+    const k=KIND[e.kind];
+    const html=`<div class="lv lv-${e.kind==="manif"?"manif":"interv"}${selected===e.id?" sel":""}"><b>${e.kind==="manif"?"✊":""}</b><span>${e.ongoing?"EN COURS · ":""}${k.lbl.toUpperCase()}</span></div>`;
+    const m=L.marker(ll(e),{icon:L.divIcon({className:"",html,iconSize:null,iconAnchor:[0,0]}),title:`${k.long} · ${e.title}`,zIndexOffset:1000,keyboard:true});
+    m.on("click",()=>select(e.id));m.addTo(liveGroup);
   });
 }
-
-/* ---------- Zoom et déplacement ---------- */
-let vb={x:0,y:0,w:VW,h:VH}, zoom=1, zAnim=0, mkPending=false, moved=false;
-function applyVB(){
-  map.setAttribute("viewBox",`${vb.x.toFixed(2)} ${vb.y.toFixed(2)} ${vb.w.toFixed(2)} ${vb.h.toFixed(2)}`);
-  zoom=VW/vb.w; document.getElementById("relBlur").setAttribute("stdDeviation",6/zoom); document.getElementById("relOff").setAttribute("dy",9/zoom);
-  map.style.touchAction=zoom>1.01?"none":"pan-y"; map.classList.toggle("grab",zoom>1.01);
-  document.getElementById("zLbl").textContent="×"+(zoom<10?zoom.toFixed(1).replace(".0",""):Math.round(zoom));
-}
-function clampVB(v){const w=Math.min(VW,Math.max(VW/16,v.w)),h=w*VH/VW;return{x:Math.min(VW-w,Math.max(0,v.x)),y:Math.min(VH-h,Math.max(0,v.y)),w,h};}
-function queueMarkers(){if(mkPending)return;mkPending=true;requestAnimationFrame(()=>{mkPending=false;drawMarkers();drawLabels();});}
-function setVB(v,anim){
-  v=clampVB(v); cancelAnimationFrame(zAnim);
-  if(!anim||reduced){vb=v;applyVB();queueMarkers();return;}
-  const from={...vb},t0=performance.now();
-  const step=t=>{const k=Math.min(1,(t-t0)/420),e=1-Math.pow(1-k,3);
-    vb={x:from.x+(v.x-from.x)*e,y:from.y+(v.y-from.y)*e,w:from.w+(v.w-from.w)*e,h:from.h+(v.h-from.h)*e};applyVB();queueMarkers();
-    if(k<1)zAnim=requestAnimationFrame(step);};
-  zAnim=requestAnimationFrame(step);
-}
-function zoomAt(f,cx,cy,anim){const w=vb.w/f;setVB({x:cx-(cx-vb.x)/f,y:cy-(cy-vb.y)/f,w,h:w*VH/VW},anim);}
-function svgPt(cx,cy){const p=map.createSVGPoint();p.x=cx;p.y=cy;return p.matrixTransform(map.getScreenCTM().inverse());}
-function zoomToDep(code){
-  const d=depByCode[code];if(!d)return;let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
-  d.rings.forEach(r=>r.forEach(([lo,la])=>{const x=px(lo),y=py(la);x1=Math.min(x1,x);x2=Math.max(x2,x);y1=Math.min(y1,y);y2=Math.max(y2,y);}));
-  const w=Math.max((x2-x1),(y2-y1)*VW/VH)*1.8;setVB({x:(x1+x2)/2-w/2,y:(y1+y2)/2-w*VH/VW/2,w,h:w*VH/VW},true);
-}
-map.addEventListener("wheel",ev=>{ev.preventDefault();const p=svgPt(ev.clientX,ev.clientY);zoomAt(Math.exp(-ev.deltaY*(ev.deltaMode?0.05:0.0018)),p.x,p.y,false);},{passive:false});
-map.addEventListener("dblclick",ev=>{ev.preventDefault();const p=svgPt(ev.clientX,ev.clientY);zoomAt(ev.shiftKey?.5:2,p.x,p.y,true);});
-const ptrs=new Map();let drag=null,pinch=null;
-map.addEventListener("pointerdown",ev=>{
-  ptrs.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
-  if(ptrs.size===1){drag={x:ev.clientX,y:ev.clientY,vb:{...vb}};moved=false;}
-  else if(ptrs.size===2){const[a,b]=[...ptrs.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y)||1,vb:{...vb},c:svgPt((a.x+b.x)/2,(a.y+b.y)/2)};drag=null;moved=true;}
-});
-window.addEventListener("pointermove",ev=>{
-  if(!ptrs.has(ev.pointerId))return;ptrs.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
-  if(pinch&&ptrs.size>=2){const[a,b]=[...ptrs.values()],f=Math.hypot(a.x-b.x,a.y-b.y)/pinch.d,w=pinch.vb.w/f,c=pinch.c;
-    setVB({x:c.x-(c.x-pinch.vb.x)/f,y:c.y-(c.y-pinch.vb.y)/f,w,h:w*VH/VW});return;}
-  if(drag){const dx=ev.clientX-drag.x,dy=ev.clientY-drag.y;if(!moved&&Math.hypot(dx,dy)>5)moved=true;
-    if(moved&&zoom>1.01){const s=1/map.getScreenCTM().a*(vb.w/drag.vb.w);map.classList.add("grabbing");tip.style.display="none";
-      setVB({x:drag.vb.x-dx*s,y:drag.vb.y-dy*s,w:drag.vb.w,h:drag.vb.h});}}
-});
-const ptrUp=ev=>{ptrs.delete(ev.pointerId);if(ptrs.size<2)pinch=null;if(!ptrs.size){drag=null;map.classList.remove("grabbing");}};
-window.addEventListener("pointerup",ptrUp);window.addEventListener("pointercancel",ptrUp);
-const zc=()=>({x:vb.x+vb.w/2,y:vb.y+vb.h/2});
-document.getElementById("zIn").onclick=()=>{const c=zc();zoomAt(1.8,c.x,c.y,true);};
-document.getElementById("zOut").onclick=()=>{const c=zc();zoomAt(1/1.8,c.x,c.y,true);};
-document.getElementById("zReset").onclick=()=>setVB({x:0,y:0,w:VW,h:VH},true);
-map.addEventListener("keydown",ev=>{if(ev.target!==map)return;const c=zc(),st=vb.w*.15;
-  if(ev.key==="+"||ev.key==="="){zoomAt(1.5,c.x,c.y,true);}else if(ev.key==="-"){zoomAt(1/1.5,c.x,c.y,true);}
-  else if(ev.key.startsWith("Arrow")){ev.preventDefault();setVB({...vb,x:vb.x+(ev.key==="ArrowRight"?st:ev.key==="ArrowLeft"?-st:0),y:vb.y+(ev.key==="ArrowDown"?st:ev.key==="ArrowUp"?-st:0)},true);}});
-map.setAttribute("tabindex","0");
 
 /* ---------- Données ---------- */
 async function load(){
@@ -460,9 +414,13 @@ async function load(){
     knownIds=ids; DATA=d;
     document.getElementById("banner").classList.remove("on");
     buildTimeline();
-    if(fresh.length){ toast(`${fresh.length} nouveau${fresh.length>1?"x":""} fait${fresh.length>1?"s":""}`); notify(fresh); }
+    if(fresh.length){
+      const nv=fresh.filter(isViol).length, nl=fresh.filter(e=>isLive(e)).length;
+      toast([nv?`${nv} nouveau${nv>1?"x":""} fait${nv>1?"s":""}`:"",nl?`${nl} en cours`:""].filter(Boolean).join(" · ")||"Mise à jour");
+      notify(fresh);
+    }
+    if(cursor===null){dropIds=new Set(fresh.map(e=>e.id));setTimeout(()=>{dropIds.clear();},1500);}
     render(fresh.map(e=>e.id));
-    if(cursor===null) fresh.forEach((e,i)=>setTimeout(()=>streak(e),i*350));
   }catch(err){
     fetchOk=false;
     const b=document.getElementById("banner");
@@ -490,7 +448,7 @@ function ago(t){const m=Math.round((Date.now()-t)/60000);if(m<1)return"à l'inst
 const hhmm=t=>new Date(t).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
 const dayLbl=t=>{const d=new Date(t),n=new Date();if(d.toDateString()===n.toDateString())return"auj.";const y=new Date(n-864e5);if(d.toDateString()===y.toDateString())return"hier";return d.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});};
 const placeLbl=e=>e.place?(e.area?e.place:`${e.place}${e.dep?" ("+e.dep+")":""}`):"lieu non détecté";
-const inPeriod=()=>{const T=now();return DATA.events.filter(e=>e.date<=T&&T-e.date<=period*3600e3);};
+const inPeriod=()=>{const T=now();return DATA.events.filter(e=>isViol(e)&&e.date<=T&&T-e.date<=period*3600e3);};
 
 function render(newIds=[]){
   const T=now(), per=inPeriod(), sevF=per.filter(e=>active.has(e.sev)), vis=depFilter?sevF.filter(e=>e.dep===depFilter):sevF;
@@ -498,15 +456,14 @@ function render(newIds=[]){
   const dc=document.getElementById("depChip");
   dc.innerHTML=depFilter?`<button class="chip depf" aria-pressed="true">${escH(depByCode[depFilter]?.nom||depFilter)} ×</button>`:"";
   if(depFilter) dc.firstChild.onclick=()=>setDep(null);
-  const score={},cnt={};sevF.forEach(e=>{if(e.dep){score[e.dep]=(score[e.dep]||0)+SEV[e.sev].w;cnt[e.dep]=(cnt[e.dep]||0)+1;}});
-  const max=Math.max(4,...Object.values(score));
-  gDeps.querySelectorAll(".dept").forEach(p=>{
-    const c=p.dataset.code,s=score[c]||0; if(depByCode[c]) depByCode[c]._n=cnt[c]||0;
-    p.style.fill=mode!=="points"&&s?heat(Math.sqrt(s/max)):"";
-    p.classList.toggle("sel",c===depFilter);
-  });
-  lastVis=vis; drawMarkers();
-  document.getElementById("legend").innerHTML=(mode!=="heat"?Object.values(SEV).map(v=>`<span><i style="background:${v.c};color:${v.c}"></i>${v.lbl}</span>`).join(""):"")+(mode!=="points"?`<span style="margin-top:4px">Intensité par département</span><span class="grad"></span>`:"");
+  heatScore={};const cnt={};sevF.forEach(e=>{if(e.dep){heatScore[e.dep]=(heatScore[e.dep]||0)+SEV[e.sev].w;cnt[e.dep]=(cnt[e.dep]||0)+1;}});
+  heatMax=Math.max(4,...Object.values(heatScore));
+  Object.keys(depByCode).forEach(c=>depByCode[c]._n=cnt[c]||0);
+  styleDeps(); drawMarkers(vis);
+  // en cours
+  const live=DATA.events.filter(e=>isLive(e,T)&&(!depFilter||e.dep===depFilter)).sort((a,b)=>(b.updated||b.date)-(a.updated||a.date));
+  drawLive(live); buildLiveUI(live);
+  document.getElementById("legend").innerHTML=(mode!=="heat"?Object.values(SEV).map(v=>`<span style="display:flex;align-items:center;gap:7px"><i style="width:9px;height:9px;border-radius:50%;background:${v.c};box-shadow:0 0 6px ${v.hex}"></i>${v.lbl}</span>`).join(""):"")+(mode!=="points"?`<span style="margin-top:4px">Intensité par département</span><span style="width:130px;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--land),var(--ember),var(--crit))"></span>`:"");
   // fil
   const feed=document.getElementById("feed");feed.innerHTML="";
   document.getElementById("feedCount").textContent=`${vis.length} sur ${PERIODS[period]}${cursor!==null?" · rejeu":""}`;
@@ -524,28 +481,44 @@ function render(newIds=[]){
   if(selected&&!DATA.events.find(x=>x.id===selected)) closeDetail(false);
 }
 
+function buildLiveUI(live){
+  const nm=live.filter(e=>e.kind==="manif").length, ni=live.filter(e=>e.kind==="intervention").length;
+  const bar=document.getElementById("livebar");
+  bar.innerHTML=`<button data-k="manif" aria-pressed="${showLive.manif}" class="${nm?"":"zero"}"><span class="dotm"></span>${nm} manif${nm>1?"s":""} en cours</button><button data-k="intervention" aria-pressed="${showLive.intervention}" class="${ni?"":"zero"}"><span class="doti"></span>${ni} intervention${ni>1?"s":""}</button>`;
+  bar.querySelectorAll("button").forEach(b=>b.onclick=()=>{showLive[b.dataset.k]=!showLive[b.dataset.k];ls.set("vf_live",showLive);render();});
+  const list=document.getElementById("liveList"), shown=live.filter(e=>showLive[e.kind]);
+  document.getElementById("liveH").hidden=!shown.length;
+  list.innerHTML=shown.slice(0,12).map(e=>`<li><button data-id="${e.id}"><span class="tag" style="background:${e.kind==="manif"?"#7C3AED":"#0E7490"}">${KIND[e.kind].lbl.toUpperCase()}</span><span>${escH(e.title)}<small>${escH(placeLbl(e))} · signalé ${ago(e.updated||e.date)}${e.ongoing?" · « en cours »":""}</small></span></button></li>`).join("");
+  list.querySelectorAll("button").forEach(b=>b.onclick=()=>select(b.dataset.id));
+}
+
 function buildTicker(){
   const T=now();
-  const top=DATA.events.filter(e=>e.date<=T&&e.sev!=="eleve").sort((a,b)=>b.date-a.date).slice(0,3);
+  const top=DATA.events.filter(e=>e.date<=T&&(e.sev==="crit"||e.sev==="grave"||isLive(e,T))).sort((a,b)=>(b.updated||b.date)-(a.updated||a.date)).slice(0,4);
   const box=document.getElementById("ticker");
   const key=top.map(e=>e.id).join();
   if(box.dataset.k===key) return; box.dataset.k=key;
   if(!top.length){box.innerHTML=`<span class="item"><em>Aucun fait grave récent</em></span>`;return;}
-  const one=top.map(e=>`<button class="item" data-id="${e.id}"><span class="dot" style="background:${SEV[e.sev].hex};box-shadow:0 0 8px ${SEV[e.sev].hex}"></span><b>${escH((e.place||"").toUpperCase())}</b>${escH(e.title)}<em>${ago(e.date)}</em></button>`).join("");
+  const col=e=>SEV[e.sev]?.hex||KIND[e.kind]?.hex||"#9B5CFF";
+  const one=top.map(e=>`<button class="item" data-id="${e.id}"><span class="dot" style="background:${col(e)};box-shadow:0 0 8px ${col(e)}"></span><b>${escH((e.place||"").toUpperCase())}</b>${isLive(e,T)?"<em style='color:#C4A5FF;font-style:normal'>EN COURS</em> ":""}${escH(e.title)}<em>${ago(e.updated||e.date)}</em></button>`).join("");
   box.innerHTML=one+one;
   box.querySelectorAll(".item").forEach(b=>b.onclick=()=>select(b.dataset.id));
 }
 
 function select(id){
   selected=id;const e=DATA.events.find(x=>x.id===id);if(!e)return;
-  const d=document.getElementById("detail");d.style.borderTopColor=SEV[e.sev].hex;
+  const col=SEV[e.sev]?.hex||KIND[e.kind]?.hex||"#9B5CFF";
+  const badge=SEV[e.sev]?`<span class="pill" style="background:${col}">${SEV[e.sev].lbl}</span>`:`<span class="pill" style="background:${col};color:#fff">${KIND[e.kind].long}</span>`;
+  const d=document.getElementById("detail");d.style.borderTopColor=col;
   d.innerHTML=`<button class="close" aria-label="Fermer">×</button>
-    <div class="row"><span><span class="pill" style="background:${SEV[e.sev].hex}">${SEV[e.sev].lbl}</span> ${escH(e.type)}</span><span>${ago(e.date)}</span></div>
+    <div class="row"><span>${badge} ${SEV[e.sev]?escH(e.type):""}</span><span>${ago(e.date)}</span></div>
     <h3>${escH(e.title)}</h3>
     <div class="row"><span>${escH(placeLbl(e))}${e.dep&&depByCode[e.dep]&&!e.area?" · "+escH(depByCode[e.dep].nom):""}</span><span>${e.articles.length} article${e.articles.length>1?"s":""}</span></div>
+    ${isLive(e)?`<div class="row" style="margin-top:6px;color:#C4A5FF">Dernier signalement ${ago(e.updated||e.date)}, peut être déjà terminé</div>`:""}
     <ol>${e.articles.map(a=>`<li><a href="${escH(safeUrl(a.url))}" target="_blank" rel="noopener">${escH(a.t)}</a><small>${escH(a.src)} · ${ago(a.date)}</small></li>`).join("")}</ol>`;
   d.classList.add("on");d.querySelector(".close").onclick=()=>closeDetail(true);
   render();
+  if(hasPos(e)) map.flyTo(ll(e),Math.max(map.getZoom(),e.area?8:12),{duration:.7});
   const li=document.getElementById("f-"+id);if(li)li.scrollIntoView({block:"nearest",behavior:"smooth"});
 }
 function closeDetail(re){selected=null;document.getElementById("detail").classList.remove("on");if(re)render();}
@@ -554,7 +527,7 @@ function stats(vis,sevF){
   const n=k=>vis.filter(e=>e.sev===k).length, T=now();
   document.getElementById("periodLbl").textContent=PERIODS[period]+(depFilter?" · "+(depByCode[depFilter]?.nom||depFilter):"");
   document.getElementById("kpis").innerHTML=`<div class="kpi"><b style="color:var(--crit);text-shadow:0 0 18px color-mix(in srgb,var(--crit) 50%,transparent)">${n("crit")}</b><span>avec mort(s)</span></div><div class="kpi"><b style="color:var(--grave)">${n("grave")}</b><span>blessés, armes</span></div><div class="kpi"><b>${vis.length}</b><span>faits</span></div>`;
-  const base=DATA.events.filter(e=>e.date<=T&&(!depFilter||e.dep===depFilter));
+  const base=DATA.events.filter(e=>isViol(e)&&e.date<=T&&(!depFilter||e.dep===depFilter));
   const s24=base.filter(e=>T-e.date<=24*3600e3).reduce((s,e)=>s+SEV[e.sev].w,0), max=depFilter?15:80, pct=Math.min(100,s24/max*100);
   document.getElementById("needle").style.left=`calc(${pct}% - 2px)`;
   document.getElementById("gval").innerHTML=`Indice sur 24 h : <b>${s24}</b> pts · ${pct>66?"situation critique":pct>33?"situation tendue":"calme relatif"}`;
@@ -563,7 +536,7 @@ function stats(vis,sevF){
   const end=new Date(T); if(step===1)end.setMinutes(60,0,0); else end.setHours(24,0,0,0);
   const t0=end.getTime()-nb*step*3600e3, bk=Array.from({length:nb},()=>({crit:0,grave:0,eleve:0}));
   vis.forEach(e=>{const i=Math.floor((e.date-t0)/(step*3600e3));if(i>=0&&i<nb)bk[i][e.sev]++;});
-  const svg=document.getElementById("timeChart");svg.innerHTML="";
+  const svg=document.getElementById("timeChart");svg.innerHTML="";const NS="http://www.w3.org/2000/svg";
   const S=(nm,a)=>{const e=document.createElementNS(NS,nm);for(const k in a)e.setAttribute(k,a[k]);svg.appendChild(e);return e};
   const top=Math.max(3,...bk.map(b=>b.crit+b.grave+b.eleve)),ch=120,x0=24,bw=(340-x0)/nb;
   [0,.5,1].forEach(f=>{const y=8+ch-ch*f;S("line",{x1:x0,x2:340,y1:y,y2:y,stroke:"var(--line)"});S("text",{x:0,y:y+4}).textContent=Math.round(top*f);});
@@ -584,23 +557,22 @@ const scrub=document.getElementById("scrub"), playBtn=document.getElementById("p
 const H=168, t0TL=()=>{const d=new Date();d.setMinutes(0,0,0);return d.getTime()+3600e3-H*3600e3;};
 function buildTimeline(){
   const base=t0TL(), bk=Array(H).fill(0);
-  DATA.events.forEach(e=>{const i=Math.floor((e.date-base)/3600e3);if(i>=0&&i<H)bk[i]+=SEV[e.sev].w;});
+  DATA.events.filter(isViol).forEach(e=>{const i=Math.floor((e.date-base)/3600e3);if(i>=0&&i<H)bk[i]+=SEV[e.sev].w;});
   const m=Math.max(1,...bk), sp=document.getElementById("spark");
   let d="M0,28";bk.forEach((v,i)=>{d+=`L${(i+.5)/H*600},${28-v/m*24}`;});d+="L600,28Z";
   sp.innerHTML=`<defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF3B4E" stop-opacity=".8"/><stop offset="1" stop-color="#FF3B4E" stop-opacity="0"/></linearGradient></defs><path d="${d}" fill="url(#sg)"/><line id="spl" x1="600" x2="600" y1="0" y2="28" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
-  const L=document.getElementById("tlLabels");L.innerHTML="";
-  for(let i=0;i<=7;i++){const s=document.createElement("span");s.textContent=i===7?"maintenant":new Date(base+i*24*3600e3).toLocaleDateString("fr-FR",{weekday:"short"});L.appendChild(s);}
+  const Lb=document.getElementById("tlLabels");Lb.innerHTML="";
+  for(let i=0;i<=7;i++){const s=document.createElement("span");s.textContent=i===7?"maintenant":new Date(base+i*24*3600e3).toLocaleDateString("fr-FR",{weekday:"short"});Lb.appendChild(s);}
 }
 function setCursor(v,animate){
-  const live=+v>=H;
-  const prevT=now();
+  const live=+v>=H, prevT=now();
   cursor=live?null:t0TL()+(+v)*3600e3;
   scrub.value=v;
   const spl=document.getElementById("spl");if(spl){spl.setAttribute("x1",v/H*600);spl.setAttribute("x2",v/H*600);}
   tlNow.classList.toggle("live",live);
   tlNow.innerHTML=live?`EN DIRECT<small>bouge le curseur pour remonter le temps</small>`:`${new Date(cursor).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric"})} ${new Date(cursor).getHours()}h<small>rejeu · ${speed}× <button class="tl-speed" id="spd">vitesse</button></small>`;
   const spd=document.getElementById("spd");if(spd)spd.onclick=()=>{speed=speed===1?4:speed===4?12:1;if(playing){pause();play();}setCursor(scrub.value);};
-  if(animate){const T=now();DATA.events.filter(e=>e.date>prevT&&e.date<=T&&active.has(e.sev)&&(!depFilter||e.dep===depFilter)).forEach((e,i)=>setTimeout(()=>streak(e),i*120));}
+  dropIds=new Set(animate?DATA.events.filter(e=>e.date>prevT&&e.date<=now()).map(e=>e.id):[]);
   render();
 }
 function play(){
@@ -613,14 +585,18 @@ playBtn.onclick=()=>playing?pause():play();
 scrub.oninput=()=>{pause();setCursor(scrub.value);};
 
 /* ---------- Alertes navigateur ---------- */
-const sevRank={crit:3,grave:2,eleve:1};
+const sevRank={crit:3,grave:2,eleve:1,info:0};
 function notify(list){
   if(!alertCfg.on) return;
-  const hits=list.filter(e=>sevRank[e.sev]>=sevRank[alertCfg.sev]&&(!alertCfg.deps.length||alertCfg.deps.includes(e.dep)));
+  const hits=list.filter(e=>{
+    if(alertCfg.deps.length&&!alertCfg.deps.includes(e.dep)) return false;
+    if(isViol(e)&&sevRank[e.sev]>=sevRank[alertCfg.sev]) return true;
+    return isLive(e)&&(alertCfg.live==="all"||(alertCfg.live==="interv"&&e.kind==="intervention"));
+  });
   if(!hits.length) return;
   if(alertCfg.sound) beep();
   if("Notification" in window && Notification.permission==="granted"){
-    hits.slice(0,5).forEach(e=>{try{const n=new Notification(e.title,{body:`${placeLbl(e)} · ${e.type} · ${e.articles[0].src}`,tag:e.id});n.onclick=()=>{window.focus();select(e.id);};}catch(_){}});
+    hits.slice(0,5).forEach(e=>{try{const n=new Notification((isLive(e)?"EN COURS · ":"")+e.title,{body:`${placeLbl(e)} · ${e.type} · ${e.articles[0].src}`,tag:e.id});n.onclick=()=>{window.focus();select(e.id);};}catch(_){}});
   }
 }
 function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.setValueAtTime(.15,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.5);o.connect(g).connect(a.destination);o.start();o.stop(a.currentTime+.5);}catch(_){}}
@@ -638,6 +614,7 @@ notifBtn.onclick=async()=>{
 const dlg=document.getElementById("settings");
 document.getElementById("settingsBtn").onclick=()=>{
   document.getElementById("sevSel").value=alertCfg.sev;
+  document.getElementById("liveSel").value=alertCfg.live||"0";
   document.getElementById("depInp").value=alertCfg.deps.join(", ");
   document.getElementById("soundSel").value=alertCfg.sound?"1":"0";
   document.getElementById("srcList").innerHTML=(DATA.feeds||[]).map(f=>`<li><span>${escH(f.name)}</span><span style="color:${f.ok?"var(--ok)":"var(--crit)"}">${f.ok?`OK · ${f.n} lus, ${f.kept} retenus`:"ne répond pas"}</span></li>`).join("")||"<li>Pas encore de passage du robot.</li>";
@@ -646,6 +623,7 @@ document.getElementById("settingsBtn").onclick=()=>{
 document.getElementById("closeSet").onclick=()=>dlg.close();
 document.getElementById("saveSet").onclick=()=>{
   alertCfg.sev=document.getElementById("sevSel").value;
+  alertCfg.live=document.getElementById("liveSel").value;
   alertCfg.deps=document.getElementById("depInp").value.split(/[,\s;]+/).map(s=>s.trim().toUpperCase()).filter(Boolean).map(s=>/^\d$/.test(s)?"0"+s:s);
   alertCfg.sound=document.getElementById("soundSel").value==="1";
   ls.set("vf_alerts",alertCfg);dlg.close();toast("Réglages enregistrés");
@@ -664,27 +642,22 @@ function tick(){
 }
 function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("on");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("on"),4500);}
 
-/* ---------- Contours détaillés des départements ---------- */
-async function loadDetailedDeps(){
-  const r=await fetch("https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson");
-  if(!r.ok) throw new Error(r.status);
-  const g=await r.json();
-  return g.features.map(f=>{
-    const polys=f.geometry.type==="Polygon"?[f.geometry.coordinates]:f.geometry.coordinates;
-    const rings=polys.map(p=>p[0]);let sx=0,sy=0,n=0;rings.forEach(r=>r.forEach(([x,y])=>{sx+=x;sy+=y;n++;}));
-    return {code:f.properties.code,nom:f.properties.nom,c:[sx/n,sy/n],rings};
-  });
+/* ---------- Contours des départements ---------- */
+async function loadDeps(){
+  let gj=null;
+  try{const r=await fetch("https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson");if(r.ok)gj=await r.json();}catch(_){}
+  if(!gj){const d=await (await fetch("departements.json")).json();gj={type:"FeatureCollection",features:d.map(x=>({type:"Feature",properties:{code:x.code,nom:x.nom},geometry:{type:"MultiPolygon",coordinates:x.rings.map(r=>[r])}}))};}
+  gj.features.forEach(f=>depByCode[f.properties.code]={nom:f.properties.nom,_n:0});
+  depGroup.addData(gj);
 }
 
 /* ---------- Démarrage ---------- */
 (async()=>{
   paintNotif(); buildFilters();
-  try{DEPS=await loadDetailedDeps();}catch(_){try{DEPS=await (await fetch("departements.json")).json();}catch(__){DEPS=[];}}
-  DEPS.forEach(d=>depByCode[d.code]=d); drawDeps();
+  try{await loadDeps();}catch(_){}
   await load(); tick();
-  // entrée en scène : les faits des dernières 24 h tombent sur la carte
-  DATA.events.filter(e=>Date.now()-e.date<24*3600e3).slice(0,12).forEach((e,i)=>setTimeout(()=>streak(e),400+i*220));
-  setInterval(tick,1000); setInterval(load,60e3);
+  dropIds=new Set(DATA.events.filter(e=>Date.now()-e.date<24*3600e3).map(e=>e.id));render();setTimeout(()=>dropIds.clear(),1500);
+  setInterval(tick,1000); setInterval(load,60e3); setInterval(()=>{if(cursor===null)render();},5*60e3);
 })();
 </script>
 </body>
