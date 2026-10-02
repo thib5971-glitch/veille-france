@@ -5,8 +5,7 @@ on:
     - cron: "*/10 * * * *"
   workflow_dispatch:
   push:
-    branches: [main]
-    paths-ignore: ["data/**"]
+    paths-ignore: ["veille-france/data/**"]
 
 permissions:
   contents: write
@@ -21,6 +20,9 @@ jobs:
   update:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: veille-france
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -58,6 +60,6 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: veille-france/_site
       - id: deploy
         uses: actions/deploy-pages@v4
