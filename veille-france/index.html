@@ -83,6 +83,11 @@ svg#map.grab{cursor:grab}svg#map.grabbing{cursor:grabbing}
 .zoomctl button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .zoomctl span{font:600 12px var(--body);color:var(--muted);text-align:center}
 .dept{fill:var(--land);stroke:var(--landline);stroke-width:.7;vector-effect:non-scaling-stroke;stroke-linejoin:round;transition:fill .5s;cursor:pointer}
+.under{fill:var(--land);stroke:var(--land);stroke-width:2.5;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.clbl{font:600 11px var(--body);fill:#C9D6E6;paint-order:stroke;stroke:#0B1320;stroke-width:3px;stroke-linejoin:round;letter-spacing:.02em}
+.clbl.big{font:700 13px var(--cond);letter-spacing:.06em;text-transform:uppercase;fill:#E9EFF6}
+.cdot{fill:#C9D6E6;stroke:#0B1320;stroke-width:1px;vector-effect:non-scaling-stroke}
+.dlbl{font:700 12px var(--cond);fill:rgba(233,239,246,.32);letter-spacing:.12em;text-transform:uppercase;text-anchor:middle}
 .dept:hover{fill:var(--landhi);stroke:#5C7A9E;stroke-width:1.2}
 .dept.sel{stroke:var(--ink);stroke-width:2}
 .marker{cursor:pointer}
@@ -324,19 +329,21 @@ const VH=Math.round(py(41.3)+PAD+10);
 const VW=Math.round(px(9.7)+PAD);
 map.setAttribute("viewBox",`0 0 ${VW} ${VH}`);
 const el=(n,a,p)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);(p||map).appendChild(e);return e};
-const gLand=el("g",{filter:"url(#relief)"}), gDeps=el("g",{},gLand), gSheen=el("g",{"pointer-events":"none"}), gMk=el("g",{}), gFx=el("g",{"pointer-events":"none"});
+const gLand=el("g",{filter:"url(#relief)"}), gUnder=el("path",{class:"under"},gLand), gDeps=el("g",{},gLand), gSheen=el("g",{"pointer-events":"none"}), gLbl=el("g",{"pointer-events":"none"}), gMk=el("g",{}), gFx=el("g",{"pointer-events":"none"});
 const tip=document.getElementById("tip");
 function drawDeps(){
   let all="";
   DEPS.forEach(d=>{
-    const path=d.rings.map(r=>r.map((p,i)=>(i?"L":"M")+px(p[0]).toFixed(1)+","+py(p[1]).toFixed(1)).join("")+"Z").join("");
+    const path=d.rings.map(r=>r.map((p,i)=>(i?"L":"M")+px(p[0]).toFixed(2)+","+py(p[1]).toFixed(2)).join("")+"Z").join("");
     all+=path;
     const p=el("path",{d:path,class:"dept","data-code":d.code},gDeps);
     p.addEventListener("mousemove",ev=>{const r=map.parentElement.getBoundingClientRect();tip.style.display="block";tip.style.left=(ev.clientX-r.left+14)+"px";tip.style.top=(ev.clientY-r.top+14)+"px";tip.textContent=`${d.nom} (${d.code}) · ${d._n||0} fait${(d._n||0)>1?"s":""}`;});
     p.addEventListener("mouseleave",()=>tip.style.display="none");
     p.addEventListener("click",()=>{if(moved)return;setDep(depFilter===d.code?null:d.code);});
   });
+  gUnder.setAttribute("d",all);
   el("path",{d:all,fill:"url(#sheen)"},gSheen);
+  drawLabels();
 }
 function setDep(code){depFilter=code;closeDetail(false);render();code?zoomToDep(code):setVB({x:0,y:0,w:VW,h:VH},true);}
 // Couleur de chaleur : terre → braise → rouge
@@ -373,6 +380,22 @@ function drawMarkers(){
   });
 }
 
+/* ---------- Noms des villes et départements selon le zoom ---------- */
+const CITIES=[["Paris",48.857,2.352,1],["Marseille",43.296,5.37,1],["Lyon",45.764,4.836,1],["Toulouse",43.605,1.444,1],["Nice",43.71,7.262,1],["Nantes",47.218,-1.554,1],["Montpellier",43.611,3.877,1],["Strasbourg",48.573,7.752,1],["Bordeaux",44.838,-0.579,1],["Lille",50.629,3.057,1],
+["Rennes",48.117,-1.678,2],["Reims",49.258,4.032,2],["Toulon",43.124,5.928,2],["Saint-Étienne",45.44,4.387,2],["Le Havre",49.494,0.108,2],["Grenoble",45.188,5.724,2],["Dijon",47.322,5.041,2],["Angers",47.478,-0.563,2],["Nîmes",43.837,4.36,2],["Clermont-Ferrand",45.778,3.087,2],["Le Mans",48.006,0.199,2],["Aix-en-Provence",43.529,5.447,2],["Brest",48.39,-4.486,2],["Tours",47.394,0.685,2],["Amiens",49.894,2.296,2],["Limoges",45.833,1.262,2],["Perpignan",42.699,2.895,2],["Metz",49.12,6.176,2],["Besançon",47.238,6.024,2],["Orléans",47.903,1.909,2],["Rouen",49.443,1.099,2],["Mulhouse",47.75,7.336,2],["Caen",49.182,-0.371,2],["Nancy",48.692,6.184,2],["Avignon",43.949,4.806,2],["Poitiers",46.58,0.34,2],["Pau",43.295,-0.37,2],["Ajaccio",41.919,8.738,2],["Bastia",42.697,9.45,2],
+["Saint-Denis",48.936,2.357,3],["Argenteuil",48.947,2.248,3],["Montreuil",48.861,2.443,3],["Roubaix",50.69,3.181,3],["Tourcoing",50.724,3.161,3],["Nanterre",48.892,2.207,3],["Créteil",48.79,2.455,3],["Versailles",48.804,2.13,3],["Dunkerque",51.034,2.377,3],["Béziers",43.344,3.216,3],["La Rochelle",46.16,-1.151,3],["Calais",50.951,1.858,3],["Cannes",43.552,7.017,3],["Antibes",43.58,7.125,3],["Colmar",48.079,7.358,3],["Saint-Nazaire",47.273,-2.213,3],["Valence",44.933,4.892,3],["Bourges",47.081,2.399,3],["Quimper",47.996,-4.102,3],["Troyes",48.297,4.074,3],["Lorient",47.748,-3.37,3],["Vannes",47.658,-2.76,3],["Niort",46.323,-0.464,3],["Chambéry",45.564,5.918,3],["Annecy",45.9,6.129,3],["Belfort",47.64,6.863,3],["Bayonne",43.493,-1.475,3],["Agen",44.203,0.616,3],["Albi",43.929,2.148,3],["Arles",43.677,4.63,3],["Cherbourg",49.639,-1.616,3],["Saint-Malo",48.649,-2.026,3],["Angoulême",45.648,0.156,3],["Montauban",44.017,1.355,3],["Chartres",48.446,1.489,3],["Évry",48.629,2.441,3],["Cergy",49.036,2.076,3],["Bobigny",48.909,2.439,3],["Villeurbanne",45.767,4.88,3],["Vénissieux",45.697,4.886,3],["Wattrelos",50.701,3.217,3],["Lens",50.432,2.833,3],["Valenciennes",50.357,3.523,3],["Beauvais",49.43,2.081,3],["Charleville-Mézières",49.773,4.72,3],["Épinal",48.173,6.449,3],["Thionville",49.358,6.168,3],["Carcassonne",43.213,2.351,3],["Narbonne",43.184,3.004,3],["Sète",43.403,3.697,3],["Fréjus",43.433,6.737,3],["Gap",44.56,6.079,3],["Auxerre",47.798,3.567,3],["Mâcon",46.307,4.828,3],["Blois",47.586,1.335,3],["Laval",48.073,-0.77,3],["Saint-Brieuc",48.514,-2.765,3],["Tarbes",43.233,0.078,3],["Périgueux",45.184,0.721,3],["Rodez",44.35,2.575,3]];
+function drawLabels(){
+  gLbl.innerHTML="";
+  const tier=zoom<1.6?1:zoom<3?2:3;
+  if(zoom>=2.4) DEPS.forEach(d=>{const t=el("text",{x:px(d.c[0]),y:py(d.c[1]),class:"dlbl",style:`font-size:${12/zoom}px`},gLbl);t.textContent=d.nom;});
+  CITIES.filter(c=>c[3]<=tier).forEach(([n,la,lo,t])=>{
+    const x=px(lo),y=py(la);
+    if(x<vb.x-20/zoom||x>vb.x+vb.w||y<vb.y||y>vb.y+vb.h+20/zoom) return;
+    el("circle",{cx:x,cy:y,r:2.2/zoom,class:"cdot"},gLbl);
+    const tx=el("text",{x:x+5/zoom,y:y-4/zoom,class:"clbl"+(t===1?" big":""),style:`font-size:${(t===1?13:11)/zoom}px;stroke-width:${3/zoom}px`},gLbl);tx.textContent=n;
+  });
+}
+
 /* ---------- Zoom et déplacement ---------- */
 let vb={x:0,y:0,w:VW,h:VH}, zoom=1, zAnim=0, mkPending=false, moved=false;
 function applyVB(){
@@ -382,7 +405,7 @@ function applyVB(){
   document.getElementById("zLbl").textContent="×"+(zoom<10?zoom.toFixed(1).replace(".0",""):Math.round(zoom));
 }
 function clampVB(v){const w=Math.min(VW,Math.max(VW/16,v.w)),h=w*VH/VW;return{x:Math.min(VW-w,Math.max(0,v.x)),y:Math.min(VH-h,Math.max(0,v.y)),w,h};}
-function queueMarkers(){if(mkPending)return;mkPending=true;requestAnimationFrame(()=>{mkPending=false;drawMarkers();});}
+function queueMarkers(){if(mkPending)return;mkPending=true;requestAnimationFrame(()=>{mkPending=false;drawMarkers();drawLabels();});}
 function setVB(v,anim){
   v=clampVB(v); cancelAnimationFrame(zAnim);
   if(!anim||reduced){vb=v;applyVB();queueMarkers();return;}
@@ -641,10 +664,22 @@ function tick(){
 }
 function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("on");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("on"),4500);}
 
+/* ---------- Contours détaillés des départements ---------- */
+async function loadDetailedDeps(){
+  const r=await fetch("https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson");
+  if(!r.ok) throw new Error(r.status);
+  const g=await r.json();
+  return g.features.map(f=>{
+    const polys=f.geometry.type==="Polygon"?[f.geometry.coordinates]:f.geometry.coordinates;
+    const rings=polys.map(p=>p[0]);let sx=0,sy=0,n=0;rings.forEach(r=>r.forEach(([x,y])=>{sx+=x;sy+=y;n++;}));
+    return {code:f.properties.code,nom:f.properties.nom,c:[sx/n,sy/n],rings};
+  });
+}
+
 /* ---------- Démarrage ---------- */
 (async()=>{
   paintNotif(); buildFilters();
-  try{DEPS=await (await fetch("departements.json")).json();}catch(_){DEPS=[];}
+  try{DEPS=await loadDetailedDeps();}catch(_){try{DEPS=await (await fetch("departements.json")).json();}catch(__){DEPS=[];}}
   DEPS.forEach(d=>depByCode[d.code]=d); drawDeps();
   await load(); tick();
   // entrée en scène : les faits des dernières 24 h tombent sur la carte
