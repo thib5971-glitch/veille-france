@@ -180,6 +180,7 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
 .mapbox{position:relative;margin-top:8px}
 #lmap{height:min(72vh,780px);min-height:420px;border-radius:8px;background:#0B1320;border:1px solid var(--line)}
 .leaflet-container{background:#0B1320;font-family:var(--body)}
+.darktiles{filter:invert(1) hue-rotate(195deg) brightness(.82) contrast(.92) saturate(.45)}
 .leaflet-bar{border:1px solid var(--line2)!important;box-shadow:none!important}
 .leaflet-bar a{background:rgba(11,19,32,.9)!important;color:var(--ink)!important;border-bottom-color:var(--line2)!important;width:36px!important;height:36px!important;line-height:36px!important;font:700 20px var(--cond)!important}
 .leaflet-bar a:hover{background:var(--panel2)!important}
@@ -305,7 +306,7 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
   </div>
 </section>
 
-<footer>Un robot relit les flux RSS des journaux toutes les 5 à 10 minutes, reconnaît la commune parmi les 35 000 de France, classe la gravité, repère les manifestations et interventions signalées comme en cours, et regroupe les articles qui parlent du même fait. « En cours » veut dire signalé par la presse il y a moins de 2 à 4 heures : il n'existe pas de flux officiel en temps réel des interventions, donc un événement peut être déjà terminé. Tout est détecté à partir des mots du titre, l'article fait foi. Fond de carte © OpenStreetMap et CARTO.</footer>
+<footer>Un robot relit les flux RSS des journaux toutes les 5 à 10 minutes, reconnaît la commune parmi les 35 000 de France, classe la gravité, repère les manifestations et interventions signalées comme en cours, et regroupe les articles qui parlent du même fait. « En cours » veut dire signalé par la presse il y a moins de 2 à 4 heures : il n'existe pas de flux officiel en temps réel des interventions, donc un événement peut être déjà terminé. Tout est détecté à partir des mots du titre, l'article fait foi. Fond de carte © les contributeurs OpenStreetMap.</footer>
 
 <dialog id="settings">
   <h3>Réglages des alertes</h3>
@@ -353,8 +354,7 @@ new ResetCtl().addTo(map);
 map.fitBounds(FR_BOUNDS);
 map.attributionControl.setPrefix(false);
 map.createPane("labels");map.getPane("labels").style.zIndex=450;map.getPane("labels").style.pointerEvents="none";
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",{subdomains:"abcd",maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",{subdomains:"abcd",maxZoom:19,pane:"labels"}).addTo(map);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,className:"darktiles",attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
 const depGroup=L.geoJSON(null,{style:()=>({color:"#3A5578",weight:1,fillColor:"#17263A",fillOpacity:0}),onEachFeature:(f,layer)=>{
   const code=f.properties.code;depLayers[code]=layer;
   layer.bindTooltip(()=>{const n=depByCode[code]?._n||0;return`${f.properties.nom} (${code}) · ${n} fait${n>1?"s":""}`;},{sticky:true,className:"dtip",direction:"top",offset:[0,-8]});
