@@ -6,18 +6,57 @@
     "departements": [],
     "maxPerRun": 8,
     "server": "https://ntfy.sh",
-    "pageUrl": ""
+    "pageUrl": "",
+    "live": false
   },
   "feeds": [
-    {"name": "Google Actu · violences", "url": "https://news.google.com/rss/search?q=fusillade%20OR%20poignard%C3%A9%20OR%20%22coups%20de%20couteau%22%20OR%20%22tu%C3%A9%20par%20balle%22%20OR%20rixe%20OR%20agression%20when%3A2d&hl=fr&gl=FR&ceid=FR:fr"},
-    {"name": "Google Actu · meurtres", "url": "https://news.google.com/rss/search?q=meurtre%20OR%20homicide%20OR%20%22retrouv%C3%A9%20mort%22%20OR%20f%C3%A9minicide%20when%3A2d&hl=fr&gl=FR&ceid=FR:fr"},
-    {"name": "Google Actu · émeutes", "url": "https://news.google.com/rss/search?q=%C3%A9meutes%20OR%20affrontements%20OR%20%22violences%20urbaines%22%20OR%20casseurs%20OR%20%22refus%20d%27obtemp%C3%A9rer%22%20when%3A2d&hl=fr&gl=FR&ceid=FR:fr"},
-    {"name": "Google Actu · faits divers", "url": "https://news.google.com/rss/search?q=%22faits%20divers%22%20when%3A1d&hl=fr&gl=FR&ceid=FR:fr"},
-    {"name": "franceinfo · faits divers", "url": "https://www.francetvinfo.fr/faits-divers.rss"},
-    {"name": "20 Minutes · faits divers", "url": "https://www.20minutes.fr/feeds/rss-faits-divers.xml"},
-    {"name": "BFMTV · police-justice", "url": "https://www.bfmtv.com/rss/police-justice/"},
-    {"name": "Le Figaro · France", "url": "https://www.lefigaro.fr/rss/figaro_actualite-france.xml"},
-    {"name": "Ouest-France · faits divers", "url": "https://www.ouest-france.fr/rss/faits-divers"},
-    {"name": "Le Parisien · faits divers", "url": "https://feeds.leparisien.fr/leparisien/rss/faits-divers"}
+    {
+      "name": "Google Actu · manifs",
+      "url": "https://news.google.com/rss/search?q=manifestation%20OR%20rassemblement%20OR%20cort%C3%A8ge%20OR%20blocage%20OR%20blocus%20when%3A12h&hl=fr&gl=FR&ceid=FR:fr"
+    },
+    {
+      "name": "Google Actu · interventions",
+      "url": "https://news.google.com/rss/search?q=%22intervention%20en%20cours%22%20OR%20RAID%20OR%20GIGN%20OR%20%22p%C3%A9rim%C3%A8tre%20de%20s%C3%A9curit%C3%A9%22%20OR%20%C3%A9vacuation%20OR%20%22prise%20d%27otage%22%20OR%20retranch%C3%A9%20when%3A12h&hl=fr&gl=FR&ceid=FR:fr"
+    },
+    {
+      "name": "Google Actu · violences",
+      "url": "https://news.google.com/rss/search?q=fusillade%20OR%20poignard%C3%A9%20OR%20%22coups%20de%20couteau%22%20OR%20%22tu%C3%A9%20par%20balle%22%20OR%20rixe%20OR%20agression%20when%3A2d&hl=fr&gl=FR&ceid=FR:fr"
+    },
+    {
+      "name": "Google Actu · meurtres",
+      "url": "https://news.google.com/rss/search?q=meurtre%20OR%20homicide%20OR%20%22retrouv%C3%A9%20mort%22%20OR%20f%C3%A9minicide%20when%3A2d&hl=fr&gl=FR&ceid=FR:fr"
+    },
+    {
+      "name": "Google Actu · émeutes",
+      "url": "https://news.google.com/rss/search?q=%C3%A9meutes%20OR%20affrontements%20OR%20%22violences%20urbaines%22%20OR%20casseurs%20OR%20%22refus%20d%27obtemp%C3%A9rer%22%20when%3A2d&hl=fr&gl=FR&ceid=FR:fr"
+    },
+    {
+      "name": "Google Actu · faits divers",
+      "url": "https://news.google.com/rss/search?q=%22faits%20divers%22%20when%3A1d&hl=fr&gl=FR&ceid=FR:fr"
+    },
+    {
+      "name": "franceinfo · faits divers",
+      "url": "https://www.francetvinfo.fr/faits-divers.rss"
+    },
+    {
+      "name": "20 Minutes · faits divers",
+      "url": "https://www.20minutes.fr/feeds/rss-faits-divers.xml"
+    },
+    {
+      "name": "BFMTV · police-justice",
+      "url": "https://www.bfmtv.com/rss/police-justice/"
+    },
+    {
+      "name": "Le Figaro · France",
+      "url": "https://www.lefigaro.fr/rss/figaro_actualite-france.xml"
+    },
+    {
+      "name": "Ouest-France · faits divers",
+      "url": "https://www.ouest-france.fr/rss/faits-divers"
+    },
+    {
+      "name": "Le Parisien · faits divers",
+      "url": "https://feeds.leparisien.fr/leparisien/rss/faits-divers"
+    }
   ]
 }
