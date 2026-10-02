@@ -1,0 +1,7 @@
+{
+  "name": "veille-france",
+  "private": true,
+  "type": "module",
+  "scripts": { "update": "node scripts/update.mjs" },
+  "dependencies": { "fast-xml-parser": "^5.2.0" }
+}
