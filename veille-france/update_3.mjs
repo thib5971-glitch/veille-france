@@ -116,7 +116,7 @@ function locate(text) {
 const R_CRIT = /\b(tue|tuee|tues|tuees|mort|morte|morts|mortes|meurtre\w*|homicide\w*|assassin\w*|abattu\w*|decede\w*|deces|cadavre|corps sans vie|attentat\w*|feminicide\w*|infanticide|perd la vie|ont perdu la vie|sans vie)\b/;
 const R_GRAVE = /\b(blesse\w*|poignard\w*|coups? de couteau|couteau|fusillade\w*|tirs?|par balles?|balles?|griev\w*|viol|violee|violees|enlev\w*|sequestr\w*|incendie criminel|arme a feu|kalachnikov|pronostic vital|machette|arme blanche|lynch\w*|passage a tabac|tabasse\w*|urgence absolue)\b/;
 const R_ELEVE = /\b(agress\w*|violences?|violent\w*|emeute\w*|rixe\w*|braquage\w*|braque\w*|affrontement\w*|interpell\w*|garde a vue|casseur\w*|mortier\w*|degradation\w*|vol a main armee|menace\w*|incendi\w*|refus d.obtemperer|narcotrafic\w*|trafic de drogue|reglement de comptes?|frappe\w*|cambriol\w*|home-jacking|car-jacking|guet-apens|caillasse\w*)\b/;
-const NOISE = /\b(football|ligue 1|match|rugby|tennis|film|serie|cinema|bande-annonce|critique|livre|roman|horoscope|meteo|recette|bourse|cac 40|jeu video|playstation|netflix|podcast|exposition|concert|festival|anniversaire de la mort|il y a \d+ ans|proces de|condamne a|jugement|cour d'assises|en appel|requisitions?|mis en examen)\b/;
+const NOISE = /\b(football|ligue 1|match|rugby|tennis|film|serie|cinema|bande-annonce|critique|livre|roman|horoscope|meteo|recette|bourse|cac 40|jeu video|playstation|netflix|podcast|exposition|concert|festival|anniversaire de la mort|il y a \d+ ans|proces de|condamne a|jugement|cour d'assises|en appel|requisitions?|requis\w*|perpetuite|verdict|condamne\w*|assises|tribunal|mis en examen|juge\w* pour)\b/;
 const FOREIGN = /\b(etats-unis|americain\w*|ukraine|ukrainien\w*|russie|russe\w*|gaza|israel\w*|liban\w*|iran\w*|syrie\w*|soudan|mexique|bresil|inde|chine|chinois|espagne|espagnol\w*|italie|italien\w*|allemagne|allemand\w*|belgique|belge\w*|suisse|royaume-uni|britannique\w*|londres|new york|texas|californie|afrique|algerie|maroc|tunisie|turquie|pakistan|afghanistan|venezuela|colombie|haiti|nigeria|congo|yemen|irak|cisjordanie)\b/;
 const TYPES = [
   ["Terrorisme", /attentat|terroris/], ["Violences conjugales", /conjoint|compagne|compagnon|feminicide|ex-mari|ex-femme|epouse|violences conjugales/],
@@ -133,9 +133,19 @@ const R_MANIF = /\b(manifestation\w*|manifestant\w*|manifester|manifesteront|man
 const R_INTERV = /\b(intervention\w*|raid|gign|bri|operation de (police|gendarmerie)|perimetre de securite|boucle\w*|evacu\w*|prise d.otages?|retranche\w*|alerte a la bombe|colis suspect|chasse a l.homme|traque|pompiers? (mobilise|engage|deploye|sur place)\w*|forces de l.ordre (deploye|mobilise|sur place)\w*|incendie en cours|feu en cours|policiers? deploye\w*|helicoptere de la gendarmerie)\b/;
 const R_ONGOING = /\b(en cours|actuellement|en ce moment|toujours en cours|se poursui\w*|en direct|direct)\b/;
 const R_PAST = /\b(proces|condamne\w*|juge\w*|il y a \d+|la semaine derniere|bilan de|retour sur|anniversaire|commemor\w*)\b/;
+// accidents, incendies sans indice criminel, animaux, procès : pas de la violence en cours
+const CRIMINEL = /meurtre|homicide|agress|\btirs?\b|poignard|couteau|fusillade|delit de fuite|refus d.obtemperer|rodeo|volontaire|criminel|intentionnel|incendiaire|molotov|vandal|degrad|emeute|rixe|policier|gendarm/;
+function isExcluded(t) {
+  if (NOISE.test(t)) return true;
+  if (/\b(accident\w*|collision|sortie de route|carambolage|motocross|noyade|noye\w*|electrocut\w*|crash|ulm|avalanche|intoxication|monoxyde|chute mortelle|percute par un train|happe par)\b/.test(t) && !CRIMINEL.test(t)) return true;
+  if (/incendi|flammes|\bfeu\b/.test(t) && !CRIMINEL.test(t)) return true;
+  if (/\b(chien|chat|cheval|animal|animaux|vache|mouton|betail)s?\b/.test(t) && !/\b(homme|femme|enfant|adolescent|personne|habitant|victime|policier|gendarme)\w*\b/.test(t)) return true;
+  return false;
+}
 function classify(title, desc) {
   const t = low(title), all = t + " " + low(desc);
   if (NOISE.test(t)) return null;
+  if (isExcluded(t)) return null;
   const kind = R_PAST.test(t) ? null : R_INTERV.test(t) ? "intervention" : R_MANIF.test(t) ? "manif" : null;
   const ongoing = !!kind && R_ONGOING.test(all);
   let sev = null;
@@ -192,7 +202,7 @@ function parseFeed(xml, feed) {
 /* ---------- Programme principal ---------- */
 const prev = await readJSON(P("data/data.json"), { events: [] });
 const firstRun = !prev.updated || !prev.events.some(e => !e.seed);
-let events = (prev.events || []).filter(e => NOW - e.date <= KEEP_MS);
+let events = (prev.events || []).filter(e => NOW - e.date <= KEEP_MS).filter(e => e.seed || e.kind || !isExcluded(low(e.title)));
 const seenLinks = new Set(events.flatMap(e => e.articles.map(a => a.url)));
 const seenTitles = new Set(events.flatMap(e => e.articles.map(a => key(a.t))));
 const feedStatus = [];
