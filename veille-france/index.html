@@ -194,6 +194,8 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
 .mk i{position:absolute;inset:0;border-radius:50%;background:var(--c);box-shadow:0 0 0 1.5px #0B1320,0 0 12px 3px color-mix(in srgb,var(--c) 65%,transparent)}
 .mk.fresh::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--c);animation:ring 2.4s ease-out infinite}
 .mk.old{opacity:.5}
+.mk.area i{background:transparent;border:2.5px dashed var(--c);box-shadow:0 0 10px 1px color-mix(in srgb,var(--c) 45%,transparent)}
+.mk.area b{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:800 10px var(--cond);color:var(--c)}
 .mk.sel i{box-shadow:0 0 0 2.5px #fff,0 0 18px 5px color-mix(in srgb,var(--c) 70%,transparent)}
 .mk.drop i{animation:drop .8s cubic-bezier(.2,.9,.3,1.25)}
 .mk.drop::before{content:"";position:absolute;left:50%;bottom:50%;width:2px;height:120px;margin-left:-1px;background:linear-gradient(to top,var(--c),transparent);filter:drop-shadow(0 0 4px var(--c));animation:streak .8s ease-out forwards;transform-origin:bottom}
@@ -462,8 +464,8 @@ function drawMarkers(vis){
   const T=now();
   [...vis].filter(hasPos).sort((a,b)=>SEV[a.sev].w-SEV[b.sev].w||a.date-b.date).forEach(e=>{
     const age=T-e.date, size=Math.round(11+SEV[e.sev].w*3+Math.min(6,(e.articles.length-1)*2));
-    const cls=["mk",age<3*3600e3?"fresh":"",age>24*3600e3?"old":"",selected===e.id?"sel":"",dropIds.has(e.id)&&!reduced?"drop":""].join(" ");
-    const m=L.marker(ll(e),{icon:L.divIcon({className:"",html:`<div class="${cls}" style="--c:${SEV[e.sev].hex};width:${size}px;height:${size}px"><i></i></div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]}),title:`${e.title} · ${placeLbl(e)}`,keyboard:true,riseOnHover:true,zIndexOffset:SEV[e.sev].w*100});
+    const cls=["mk",e.area?"area":"",age<3*3600e3?"fresh":"",age>24*3600e3?"old":"",selected===e.id?"sel":"",dropIds.has(e.id)&&!reduced?"drop":""].join(" ");
+    const m=L.marker(ll(e),{icon:L.divIcon({className:"",html:`<div class="${cls}" style="--c:${SEV[e.sev].hex};width:${e.area?size+8:size}px;height:${e.area?size+8:size}px"><i></i>${e.area?"<b>?</b>":""}</div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]}),title:`${e.title} · ${placeLbl(e)}${e.area?" (lieu précis inconnu, placé au centre du département)":""}`,keyboard:true,riseOnHover:true,zIndexOffset:SEV[e.sev].w*100});
     m.on("click",()=>select(e.id));m.addTo(mkGroup);
   });
 }
@@ -571,7 +573,7 @@ function render(newIds=[]){
   // en cours
   const live=DATA.events.filter(e=>isLive(e,T)&&(!depFilter||e.dep===depFilter)).sort((a,b)=>(b.updated||b.date)-(a.updated||a.date));
   drawLive(live); buildLiveUI(live);
-  document.getElementById("legend").innerHTML=(mode!=="heat"?Object.values(SEV).map(v=>`<span style="display:flex;align-items:center;gap:7px"><i style="width:9px;height:9px;border-radius:50%;background:${v.c};box-shadow:0 0 6px ${v.hex}"></i>${v.lbl}</span>`).join(""):"")+(mode!=="points"?`<span style="margin-top:4px">Intensité par département</span><span style="width:130px;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--land),var(--ember),var(--crit))"></span>`:"");
+  document.getElementById("legend").innerHTML=(mode!=="heat"?Object.values(SEV).map(v=>`<span style="display:flex;align-items:center;gap:7px"><i style="width:9px;height:9px;border-radius:50%;background:${v.c};box-shadow:0 0 6px ${v.hex}"></i>${v.lbl}</span>`).join("")+`<span style="display:flex;align-items:center;gap:7px"><i style="width:10px;height:10px;border-radius:50%;border:2px dashed var(--muted)"></i>Département seulement</span>`:"")+(mode!=="points"?`<span style="margin-top:4px">Intensité par département</span><span style="width:130px;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--land),var(--ember),var(--crit))"></span>`:"");
   // fil
   const feed=document.getElementById("feed");feed.innerHTML="";
   document.getElementById("feedCount").textContent=`${vis.length} sur ${PERIODS[period]}${cursor!==null?" · rejeu":""}`;
@@ -700,7 +702,7 @@ function select(id){
   d.innerHTML=`<button class="close" aria-label="Fermer">×</button>
     <div class="row"><span>${badge} ${SEV[e.sev]?escH(e.type):""}</span><span>${ago(e.date)}</span></div>
     <h3>${escH(e.title)}</h3>
-    <div class="row"><span>${escH(placeLbl(e))}${e.dep&&depByCode[e.dep]&&!e.area?" · "+escH(depByCode[e.dep].nom):""}</span><span>${e.articles.length} article${e.articles.length>1?"s":""}</span></div>
+    <div class="row"><span>${escH(placeLbl(e))}${e.dep&&depByCode[e.dep]&&!e.area?" · "+escH(depByCode[e.dep].nom):""}${e.area?" · ville non précisée":""}</span><span>${e.articles.length} article${e.articles.length>1?"s":""}</span></div>
     ${isLive(e)?`<div class="row" style="margin-top:6px;color:#C4A5FF">Dernier signalement ${ago(e.updated||e.date)}, peut être déjà terminé</div>`:""}
     ${versionsHTML(e)}
     ${e.manif?`<div class="dsec"><h4>Organisateurs cités</h4><div class="orgs">${orgBadges(e)}</div></div>

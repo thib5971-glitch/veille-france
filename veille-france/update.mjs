@@ -224,7 +224,8 @@ results.forEach((r, i) => {
     if (NOW - it.date > KEEP_MS) continue;
     if (seenLinks.has(it.link) || seenTitles.has(key(it.title))) continue;
     const c = classify(it.title, it.desc); if (!c) continue;
-    const g = locate(it.title) || locate(it.desc);
+    let g = locate(it.title);
+    if (!g || g.area) { const g2 = locate(it.desc); if (g2 && (!g || (!g2.area && g2.dep === g.dep))) g = g2; }
     if (c.foreign && (!g || g.area)) continue;
     // annonce d'une manif à venir : va dans « prévues », pas sur la carte des faits
     if (c.kind === "manif" && (!it.bsky || it.trusted) && ANNOUNCE.test(low(it.title + " " + it.desc))) {
