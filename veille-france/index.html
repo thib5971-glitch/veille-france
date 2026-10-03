@@ -251,6 +251,16 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
 .mroute b{color:#C4A5FF;font-weight:600}
 .mmotif{font-size:13px;color:var(--muted)}
 .mfoot{font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+.mtabs{display:flex;gap:6px;padding:0 16px 10px}
+.mtabs button{font:700 13px var(--cond);letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border-radius:6px;border:1px solid var(--line2);background:var(--bg2);color:var(--muted);cursor:pointer}
+.mtabs button[aria-selected="true"]{color:#fff;border-color:#9B5CFF;background:rgba(124,58,237,.25)}
+.mday{grid-column:1/-1;font:700 14px var(--cond);letter-spacing:.08em;text-transform:uppercase;color:#C4A5FF;margin-top:4px}
+.mcard.plan{border-left-color:#5B4B8A;background:rgba(255,255,255,.02)}
+.mcard .when{font:800 15px var(--cond);color:#C4A5FF;letter-spacing:.03em}
+.pl{display:flex;align-items:center;gap:5px;white-space:nowrap;transform:translate(-8px,-8px)}
+.pl b{width:16px;height:16px;border-radius:50%;border:2.5px solid #B88BFF;background:rgba(11,19,32,.85);box-shadow:0 0 10px rgba(155,92,255,.6)}
+.pl span{font:700 10.5px var(--cond);letter-spacing:.06em;color:#E9DDFF;background:rgba(11,19,32,.85);border:1px solid #5B4B8A;padding:1px 5px;border-radius:3px}
+.livebar .dotp{width:9px;height:9px;border-radius:50%;border:2px solid #B88BFF}
 .mempty{padding:0 18px 16px;color:var(--muted);font-size:14px}
 .mroute-line{stroke-dasharray:10 8;animation:dash 1.2s linear infinite}
 @keyframes dash{to{stroke-dashoffset:-18}}
@@ -311,7 +321,8 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
 </main>
 
 <div class="manifwrap"><section class="panel" aria-label="Manifestations en cours">
-  <h2>Manifestations en cours <small id="manifCount"></small></h2>
+  <h2>Manifestations <small id="manifCount"></small></h2>
+  <div class="mtabs" role="tablist"><button role="tab" id="tabLive" aria-selected="true">En cours</button><button role="tab" id="tabPlan" aria-selected="false">Prévues</button></div>
   <div class="mgrid" id="manifGrid"></div>
 </section></div>
 
@@ -371,7 +382,8 @@ const ls={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}
 const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
 let DATA={events:[],feeds:[],updated:null}, depByCode={}, depLayers={};
 let period=ls.get("vf_period",24), mode=ls.get("vf_mode","both"), active=new Set(Object.keys(SEV));
-let showLive=ls.get("vf_live",{manif:true,intervention:true});
+let showLive=Object.assign({manif:true,intervention:true,planned:true},ls.get("vf_live",{}));
+let manifTab="live";
 let depFilter=null, selected=null, knownIds=null, lastFetch=0, fetchOk=false;
 let alertCfg=Object.assign({on:false,sev:"crit",deps:[],sound:true,live:"0"},ls.get("vf_alerts",{}));
 let cursor=null, playing=null, speed=1, dropIds=new Set();
@@ -441,6 +453,24 @@ function drawRoutes(list){
     }
     if(m.from?.lat!=null) L.marker([m.from.lat,m.from.lon],{icon:L.divIcon({className:"",html:'<div class="rpin">D</div>',iconSize:[22,22],iconAnchor:[11,11]}),title:"Départ : "+m.from.label,zIndexOffset:900}).on("click",()=>select(e.id)).addTo(routeGroup);
     if(m.to?.lat!=null) L.marker([m.to.lat,m.to.lon],{icon:L.divIcon({className:"",html:'<div class="rpin end">A</div>',iconSize:[22,22],iconAnchor:[11,11]}),title:"Arrivée : "+m.to.label,zIndexOffset:900}).on("click",()=>select(e.id)).addTo(routeGroup);
+  });
+}
+/* ---------- Manifs prévues ---------- */
+const pWin=p=>p.hasTime?[p.start-30*60e3,(p.end&&p.end>p.start?p.end:p.start+3*3600e3)]:[p.start-2*3600e3,p.start+6*3600e3];
+const plannedLiveNow=(T=now())=>(DATA.planned||[]).filter(p=>{const[a,b]=pWin(p);return T>=a&&T<=b&&(!depFilter||p.dep===depFilter);});
+const plannedNext=(T=now())=>(DATA.planned||[]).filter(p=>pWin(p)[0]>T&&(!depFilter||p.dep===depFilter)).sort((a,b)=>a.start-b.start);
+const whenLbl=p=>{const d=new Date(p.start);const day=dayLbl(p.start)==="auj."?"Aujourd'hui":dayLbl(p.start)==="hier"?"Hier":d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});return{day:day.charAt(0).toUpperCase()+day.slice(1),time:p.hasTime?hhmm(p.start).replace(":","h"):"heure non précisée"};};
+const shortWhen=p=>{const d=new Date(p.start);const w=dayLbl(p.start)==="auj."?"AUJ":d.toLocaleDateString("fr-FR",{weekday:"short"}).replace(".","").toUpperCase();return`${w}${p.hasTime?" "+d.getHours()+"H"+(d.getMinutes()?String(d.getMinutes()).padStart(2,"0"):""):""}`;};
+const planGroup=L.layerGroup().addTo(map);
+function drawPlanned(liveP,nextP){
+  planGroup.clearLayers();
+  if(!showLive.planned) return;
+  const T=now();
+  nextP.filter(p=>p.lat!=null&&p.start-T<7*864e5).forEach(p=>{
+    L.marker([p.lat,p.lon],{icon:L.divIcon({className:"",html:`<div class="pl"><b></b><span>${escH(shortWhen(p))}</span></div>`,iconSize:null,iconAnchor:[0,0]}),title:`Prévue · ${p.title}`,zIndexOffset:500,keyboard:true}).on("click",()=>select(p.id)).addTo(planGroup);
+  });
+  liveP.filter(p=>p.lat!=null).forEach(p=>{
+    L.marker([p.lat,p.lon],{icon:L.divIcon({className:"",html:`<div class="lv lv-manif"><b>✊</b><span>PRÉVUE · EN COURS</span></div>`,iconSize:null,iconAnchor:[0,0]}),title:p.title,zIndexOffset:950,keyboard:true}).on("click",()=>select(p.id)).addTo(planGroup);
   });
 }
 function drawLive(list){
@@ -528,26 +558,46 @@ function render(newIds=[]){
   });
   stats(vis,sevF);
   buildTicker();
-  if(selected&&!DATA.events.find(x=>x.id===selected)) closeDetail(false);
+  if(selected&&!DATA.events.find(x=>x.id===selected)&&!(DATA.planned||[]).find(x=>x.id===selected)) closeDetail(false);
 }
 
 function buildLiveUI(live){
-  const nm=live.filter(e=>e.kind==="manif").length, ni=live.filter(e=>e.kind==="intervention").length;
+  const liveP=plannedLiveNow().filter(p=>!live.some(e=>e.kind==="manif"&&e.place&&p.place&&e.place===p.place)), nextP=plannedNext();
+  drawPlanned(liveP,nextP);
+  const nm=live.filter(e=>e.kind==="manif").length+liveP.length, ni=live.filter(e=>e.kind==="intervention").length, np=nextP.filter(p=>p.start-now()<7*864e5).length;
   const bar=document.getElementById("livebar");
-  bar.innerHTML=`<button data-k="manif" aria-pressed="${showLive.manif}" class="${nm?"":"zero"}"><span class="dotm"></span>${nm} manif${nm>1?"s":""} en cours</button><button data-k="intervention" aria-pressed="${showLive.intervention}" class="${ni?"":"zero"}"><span class="doti"></span>${ni} intervention${ni>1?"s":""}</button>`;
+  bar.innerHTML=`<button data-k="manif" aria-pressed="${showLive.manif}" class="${nm?"":"zero"}"><span class="dotm"></span>${nm} manif${nm>1?"s":""} en cours</button><button data-k="intervention" aria-pressed="${showLive.intervention}" class="${ni?"":"zero"}"><span class="doti"></span>${ni} intervention${ni>1?"s":""}</button><button data-k="planned" aria-pressed="${showLive.planned}" class="${np?"":"zero"}"><span class="dotp"></span>${np} prévue${np>1?"s":""} (7 j)</button>`;
   bar.querySelectorAll("button").forEach(b=>b.onclick=()=>{showLive[b.dataset.k]=!showLive[b.dataset.k];ls.set("vf_live",showLive);render();});
-  buildManifPanel(live.filter(e=>e.kind==="manif"));
+  buildManifPanel(live.filter(e=>e.kind==="manif"),liveP,nextP);
   const list=document.getElementById("liveList"), shown=live.filter(e=>e.kind==="intervention"&&showLive.intervention);
   document.getElementById("liveH").hidden=!shown.length;
   list.innerHTML=shown.slice(0,12).map(e=>`<li><button data-id="${e.id}"><span class="tag" style="background:${e.kind==="manif"?"#7C3AED":"#0E7490"}">${KIND[e.kind].lbl.toUpperCase()}</span><span>${escH(e.title)}<small>${escH(placeLbl(e))} · signalé ${ago(e.updated||e.date)}${e.ongoing?" · « en cours »":""}</small></span></button></li>`).join("");
   list.querySelectorAll("button").forEach(b=>b.onclick=()=>select(b.dataset.id));
 }
 
-function buildManifPanel(ms){
-  const g=document.getElementById("manifGrid");
-  document.getElementById("manifCount").textContent=ms.length?`${ms.length} signalée${ms.length>1?"s":""} ces dernières heures`:"";
-  if(!ms.length){g.innerHTML=`<p class="mempty">Aucune manifestation signalée en ce moment${depFilter?" dans ce département":""}.</p>`;return;}
-  g.innerHTML=ms.map(e=>{const m=e.manif||{};
+function planCard(p,live){
+  const w=whenLbl(p);
+  return`<button class="mcard plan${selected===p.id?" sel":""}" data-id="${p.id}"><div class="city">${escH(p.place||"National / lieu à préciser")}<small>${live?"en cours selon l'agenda":(p.dep&&depByCode[p.dep]?escH(depByCode[p.dep].nom):"")}</small></div>
+    ${live?"":`<div class="when">${escH(w.time)}</div>`}<div class="orgs">${p.orgs?.length?p.orgs.map(o=>`<span class="org ${o.type}" title="${escH(o.nom)}">${escH(o.sigle)}${o.famille?`<em>${escH(o.famille)}</em>`:""}</span>`).join(""):`<span class="org none">Organisateurs non identifiés</span>`}</div>
+    <div class="mt">${escH(p.title)}</div>${p.where?`<div class="mroute"><b>Lieu</b> ${escH(p.where)}</div>`:""}
+    <div class="mfoot"><span>${p.origin==="agenda"?"agenda militant":"annonce presse"}</span><span>${p.sources.length} source${p.sources.length>1?"s":""}</span></div></button>`;
+}
+function buildManifPanel(ms,liveP=[],nextP=[]){
+  const g=document.getElementById("manifGrid"), tl=document.getElementById("tabLive"), tp=document.getElementById("tabPlan");
+  tl.textContent=`En cours (${ms.length+liveP.length})`; tp.textContent=`Prévues (${nextP.length})`;
+  tl.setAttribute("aria-selected",manifTab==="live");tp.setAttribute("aria-selected",manifTab==="plan");
+  tl.onclick=()=>{manifTab="live";render();};tp.onclick=()=>{manifTab="plan";render();};
+  const bind=()=>g.querySelectorAll(".mcard").forEach(b=>b.onclick=()=>{select(b.dataset.id);document.getElementById("lmap").scrollIntoView({behavior:"smooth",block:"center"});});
+  if(manifTab==="plan"){
+    document.getElementById("manifCount").textContent=nextP.length?"agendas militants et annonces dans la presse":"";
+    if(!nextP.length){g.innerHTML=`<p class="mempty">Aucune manifestation annoncée pour l'instant${depFilter?" dans ce département":""}.</p>`;return;}
+    let html="",last="";
+    nextP.slice(0,80).forEach(p=>{const d=whenLbl(p).day;if(d!==last){html+=`<div class="mday">${escH(d)}</div>`;last=d;}html+=planCard(p,false);});
+    g.innerHTML=html;bind();return;
+  }
+  document.getElementById("manifCount").textContent=ms.length+liveP.length?"signalées ces dernières heures ou prévues maintenant":"";
+  if(!ms.length&&!liveP.length){g.innerHTML=`<p class="mempty">Aucune manifestation en cours en ce moment${depFilter?" dans ce département":""}. Regarde l'onglet « Prévues » pour les prochaines.</p>`;return;}
+  g.innerHTML=liveP.map(p=>planCard(p,true)).join("")+ms.map(e=>{const m=e.manif||{};
     const route=m.from||m.to?`<div class="mroute">${m.from?`<b>Départ</b> ${escH(m.from.label)}`:""}${m.from&&m.to?" → ":""}${m.to?`<b>Arrivée</b> ${escH(m.to.label)}`:""}</div>`:"";
     return`<button class="mcard${selected===e.id?" sel":""}" data-id="${e.id}"><div class="city">${escH(e.place||"Lieu inconnu")}<small>${m.rdv?"rdv "+m.rdv+" · ":""}signalée ${ago(e.updated||e.date)}</small></div>
       <div class="orgs">${orgBadges(e)}</div><div class="mt">${escH(e.title)}</div>${route}
@@ -569,7 +619,23 @@ function buildTicker(){
   box.querySelectorAll(".item").forEach(b=>b.onclick=()=>select(b.dataset.id));
 }
 
+function selectPlanned(p){
+  const w=whenLbl(p),d=document.getElementById("detail");d.style.borderTopColor="#B88BFF";
+  d.innerHTML=`<button class="close" aria-label="Fermer">×</button>
+    <div class="row"><span><span class="pill" style="background:#5B4B8A;color:#fff">Manif prévue</span></span><span>${p.origin==="agenda"?"agenda militant":"annonce presse"}</span></div>
+    <h3>${escH(p.title)}</h3>
+    <div class="row"><span>${escH(w.day)} · ${escH(w.time)}</span><span>${escH(p.place||"lieu à préciser")}${p.dep?" ("+escH(p.dep)+")":""}</span></div>
+    ${p.where?`<div class="dsec"><h4>Lieu de rendez-vous</h4>${escH(p.where)}</div>`:""}
+    <div class="dsec"><h4>Organisateurs cités</h4><div class="orgs">${p.orgs?.length?p.orgs.map(o=>`<span class="org ${o.type}" title="${escH(o.nom)}">${escH(o.sigle)}${o.famille?`<em>${escH(o.famille)}</em>`:""}</span>`).join(""):`<span class="org none">non identifiés</span>`}</div></div>
+    <div class="dsec"><h4>Sources</h4></div>
+    <ol>${p.sources.map(s=>`<li><a href="${escH(safeUrl(s.url))}" target="_blank" rel="noopener">${escH(s.src)}</a></li>`).join("")}</ol>
+    <p style="color:var(--muted);font-size:12px;margin:8px 0 0">Annonce non confirmée : horaires et lieux peuvent changer, vérifie auprès de la source.</p>`;
+  d.classList.add("on");d.querySelector(".close").onclick=()=>closeDetail(true);
+  render();
+  if(p.lat!=null) map.flyTo([p.lat,p.lon],Math.max(map.getZoom(),p.precise?15:11),{duration:.7});
+}
 function select(id){
+  const pl=(DATA.planned||[]).find(x=>x.id===id);if(pl){selected=id;return selectPlanned(pl);}
   selected=id;const e=DATA.events.find(x=>x.id===id);if(!e)return;
   const col=SEV[e.sev]?.hex||KIND[e.kind]?.hex||"#9B5CFF";
   const badge=SEV[e.sev]?`<span class="pill" style="background:${col}">${SEV[e.sev].lbl}</span>`:`<span class="pill" style="background:${col};color:#fff">${KIND[e.kind].long}</span>`;
