@@ -340,7 +340,7 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
   </div>
 </section>
 
-<footer>Un robot relit les flux RSS des journaux toutes les 5 à 10 minutes, reconnaît la commune parmi les 35 000 de France, classe la gravité, repère les manifestations et interventions signalées comme en cours, et regroupe les articles qui parlent du même fait. « En cours » veut dire signalé par la presse il y a moins de 2 à 4 heures : il n'existe pas de flux officiel en temps réel des interventions, donc un événement peut être déjà terminé. Tout est détecté à partir des mots du titre, l'article fait foi. Fond de carte © les contributeurs OpenStreetMap.</footer>
+<footer>Un robot relit les flux RSS des journaux et les posts Bluesky toutes les 5 à 10 minutes, reconnaît la commune parmi les 35 000 de France, classe la gravité, repère les manifestations et interventions signalées comme en cours, et regroupe les articles qui parlent du même fait. « En cours » veut dire signalé par la presse il y a moins de 2 à 4 heures : il n'existe pas de flux officiel en temps réel des interventions, donc un événement peut être déjà terminé. Tout est détecté à partir des mots du titre, l'article fait foi. Fond de carte © les contributeurs OpenStreetMap.</footer>
 
 <dialog id="settings">
   <h3>Réglages des alertes</h3>
@@ -522,7 +522,7 @@ function render(newIds=[]){
     const li=document.createElement("li");li.id="f-"+e.id;
     if(selected===e.id)li.classList.add("sel");if(newIds.includes(e.id))li.classList.add("new");
     const n=e.articles.length,c=SEV[e.sev].hex;
-    li.innerHTML=`<button class="it"><span class="time">${hhmm(e.date)}<small>${dayLbl(e.date)}</small></span><span><div class="ft"><span class="dot" style="background:${c};color:${c}"></span>${escH(e.title)}</div><div class="fm">${escH(placeLbl(e))} · ${escH(e.articles[0].src)}${n>1?`<span class="badge">${n} sources</span>`:""}</div></span></button>`;
+    li.innerHTML=`<button class="it"><span class="time">${hhmm(e.date)}<small>${dayLbl(e.date)}</small></span><span><div class="ft"><span class="dot" style="background:${c};color:${c}"></span>${escH(e.title)}</div><div class="fm">${escH(placeLbl(e))} · ${escH(e.articles[0].src)}${n>1?`<span class="badge">${n} sources</span>`:""}${e.witness?.length?`<span class="badge" style="color:#7DB8FF">+${e.witness.length} Bluesky</span>`:""}</div></span></button>`;
     li.querySelector("button").onclick=()=>select(e.id);
     feed.appendChild(li);
   });
@@ -552,7 +552,7 @@ function buildManifPanel(ms){
     return`<button class="mcard${selected===e.id?" sel":""}" data-id="${e.id}"><div class="city">${escH(e.place||"Lieu inconnu")}<small>${m.rdv?"rdv "+m.rdv+" · ":""}signalée ${ago(e.updated||e.date)}</small></div>
       <div class="orgs">${orgBadges(e)}</div><div class="mt">${escH(e.title)}</div>${route}
       ${m.motifs?.length?`<div class="mmotif">${escH(m.motifs.slice(0,2).join(" · "))}</div>`:""}
-      <div class="mfoot">${m.foule?`<span>${escH(m.foule)}</span>`:""}<span>${e.articles.length} source${e.articles.length>1?"s":""}</span>${m.route?"<span>parcours tracé</span>":""}</div></button>`;}).join("");
+      <div class="mfoot">${m.foule?`<span>${escH(m.foule)}</span>`:""}<span>${e.articles.length} source${e.articles.length>1?"s":""}</span>${e.witness?.length?`<span style="color:#7DB8FF">${e.witness.length} témoignage${e.witness.length>1?"s":""} Bluesky</span>`:""}${m.route?"<span>parcours tracé</span>":""}</div></button>`;}).join("");
   g.querySelectorAll(".mcard").forEach(b=>b.onclick=()=>{select(b.dataset.id);document.getElementById("lmap").scrollIntoView({behavior:"smooth",block:"center"});});
 }
 
@@ -584,7 +584,8 @@ function select(id){
       ${e.manif.motifs?.length?`<div class="dsec"><h4>Motifs relevés dans la presse</h4><ul>${e.manif.motifs.map(x=>`<li>${escH(x)}</li>`).join("")}</ul></div>`:""}
       ${e.manif.rdv||e.manif.foule?`<div class="dsec"><h4>Infos</h4>${e.manif.rdv?`Rendez-vous ${escH(e.manif.rdv)}`:""}${e.manif.rdv&&e.manif.foule?" · ":""}${e.manif.foule?escH(e.manif.foule):""}</div>`:""}
       <div class="dsec"><h4>Sources</h4></div>`:""}
-    <ol>${e.articles.map(a=>`<li><a href="${escH(safeUrl(a.url))}" target="_blank" rel="noopener">${escH(a.t)}</a><small>${escH(a.src)} · ${ago(a.date)}</small></li>`).join("")}</ol>`;
+    <ol>${e.articles.map(a=>`<li><a href="${escH(safeUrl(a.url))}" target="_blank" rel="noopener">${escH(a.t)}</a><small>${escH(a.src)} · ${ago(a.date)}</small></li>`).join("")}</ol>
+    ${e.witness?.length?`<div class="dsec"><h4>Sur Bluesky · ${e.witness.length} post${e.witness.length>1?"s":""} en parle${e.witness.length>1?"nt":""}</h4><ul>${[...e.witness].sort((a,b)=>b.date-a.date).slice(0,8).map(w=>`<li><a href="${escH(safeUrl(w.url))}" target="_blank" rel="noopener">Voir le post</a> <span style="color:var(--muted)">${ago(w.date)}</span></li>`).join("")}</ul><p style="color:var(--muted);font-size:12px;margin:4px 0 0">Témoignages non vérifiés, rattachés automatiquement par lieu et sujet.</p></div>`:""}`;
   d.classList.add("on");d.querySelector(".close").onclick=()=>closeDetail(true);
   render();
   if(e.manif?.route?.length>1) map.flyToBounds(L.latLngBounds(e.manif.route),{padding:[60,60],maxZoom:16,duration:.7});
