@@ -1,801 +1,199 @@
-<!DOCTYPE html>
-<html lang="fr" data-theme="dark">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0B1320">
-<title>Veille France – salle de crise</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚨</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-:root{
-  color-scheme:dark;
-  --bg:#0B1320; --bg2:#0F1A2A; --panel:#131F31; --panel2:#18273C; --ink:#E9EFF6; --muted:#8597AE; --line:#22344B; --line2:#2C4361;
-  --land:#17263A; --landhi:#1E3149; --landline:#2B4260;
-  --crit:#FF3B4E; --grave:#FF9F1C; --eleve:#4DA3FF; --ember:#FF6B2C; --ok:#3DDC97; --focus:#9CC8FF;
-  --cond:"Barlow Condensed","Arial Narrow","Roboto Condensed",system-ui,sans-serif;
-  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
-  box-sizing:border-box;
-  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
-}
-*,*::before,*::after{box-sizing:border-box}
-html{background:var(--bg)}
-body{margin:0;color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;
-  background:radial-gradient(1200px 700px at 30% 0%,#13243A 0%,transparent 60%),var(--bg);min-height:100vh}
-a{color:inherit}
-button{font-family:inherit}
+// Enrichit les manifestations : organisateurs, parcours (départ → arrivée), motifs, foule, heure de rendez-vous.
+// Sources : titres et résumés RSS + texte des articles quand le lien est direct.
+// Géocodage : Nominatim (OpenStreetMap), tracé à pied : routing.openstreetmap.de. Tout est mis en cache.
+import fs from "node:fs/promises";
 
-/* ---------- Bandeau flash ---------- */
-.ticker{display:flex;align-items:stretch;background:#07101B;border-bottom:1px solid var(--line);height:38px;overflow:hidden}
-.ticker .tag{flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;background:var(--crit);color:#fff;font-family:var(--cond);font-weight:800;font-size:17px;letter-spacing:.06em}
-.ticker .tag i{width:8px;height:8px;border-radius:50%;background:#fff;animation:blink 1.2s infinite}
-.ticker .rail{flex:1;overflow:hidden;position:relative;mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent)}
-.ticker .track{display:flex;gap:48px;white-space:nowrap;position:absolute;left:0;top:0;height:100%;align-items:center;animation:scroll 40s linear infinite;padding-left:24px}
-.ticker:hover .track{animation-play-state:paused}
-.ticker .item{display:inline-flex;align-items:center;gap:10px;font-size:15px;cursor:pointer;background:none;border:0;color:var(--ink);padding:0}
-.ticker .item b{font-family:var(--cond);font-weight:700;font-size:16px;letter-spacing:.02em}
-.ticker .item em{font-style:normal;color:var(--muted);font-size:13px}
-.ticker .dot{width:8px;height:8px;border-radius:50%;flex:none}
-@keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-@keyframes blink{50%{opacity:.2}}
+const UA = "VeilleFrance/1.0 (carte d'actualité ; github actions)";
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const norm = s => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’ʼ]/g, "'");
 
-/* ---------- En-tête ---------- */
-header{display:grid;grid-template-columns:auto 1fr auto;gap:12px 24px;align-items:center;padding:18px 24px 14px}
-@media (max-width:860px){header{grid-template-columns:1fr}}
-h1{margin:0;font-family:var(--cond);font-weight:800;font-size:clamp(28px,3.6vw,42px);line-height:.95;letter-spacing:.01em;text-transform:uppercase}
-h1 small{display:block;font-family:var(--body);font-weight:500;font-size:13px;letter-spacing:0;text-transform:none;color:var(--muted);margin-top:6px}
-.status{font-size:13.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}
-.status b{color:var(--ink);font-weight:600}
-.status .live{display:inline-flex;align-items:center;gap:6px;font-family:var(--cond);font-weight:700;font-size:15px;letter-spacing:.08em;color:var(--muted)}
-.status .live i{width:9px;height:9px;border-radius:50%;background:var(--muted)}
-.status .live.on{color:var(--crit)}
-.status .live.on i{background:var(--crit);box-shadow:0 0 10px var(--crit);animation:blink 1.6s infinite}
-.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-@media (max-width:860px){.tools{justify-content:flex-start}}
-#clock{font-family:var(--cond);font-variant-numeric:tabular-nums;font-weight:700;font-size:30px;line-height:1;margin-right:8px;letter-spacing:.02em}
-.btn{font:600 14px var(--body);padding:8px 14px;border-radius:6px;border:1px solid var(--line2);background:var(--panel2);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
-.btn:hover{border-color:var(--muted)}
-.btn.on{background:var(--crit);border-color:var(--crit);color:#fff;box-shadow:0 0 18px color-mix(in srgb,var(--crit) 45%,transparent)}
-#banner{display:none;margin:0 24px 10px;padding:10px 14px;border:1px solid color-mix(in srgb,var(--grave) 50%,transparent);background:color-mix(in srgb,var(--grave) 12%,transparent);border-radius:6px;font-size:14px}
-#banner.on{display:block}
+/* ---------- Organisateurs connus ----------
+   type : syndicat, parti, collectif. "famille" n'est renseignée que pour les partis,
+   selon le classement le plus courant dans la presse française. */
+export const ORGS = [
+  // syndicats de salariés
+  ["CGT", "Confédération générale du travail", "syndicat", null, /\bCGT\b/],
+  ["FO", "Force ouvrière", "syndicat", null, /\bFO\b|Force ouvri[eè]re/],
+  ["CFDT", "Confédération française démocratique du travail", "syndicat", null, /\bCFDT\b/],
+  ["Solidaires", "Union syndicale Solidaires (SUD)", "syndicat", null, /\bSolidaires\b|\bSUD[- ](?:Rail|Santé|Éducation|PTT|Industrie)|\bSUD\b/],
+  ["FSU", "Fédération syndicale unitaire", "syndicat", null, /\bFSU\b|\bSNES(?:-FSU)?\b/],
+  ["UNSA", "Union nationale des syndicats autonomes", "syndicat", null, /\bUNSA\b/],
+  ["CFE-CGC", "CFE-CGC", "syndicat", null, /\bCFE[- ]CGC\b/],
+  ["CFTC", "Confédération française des travailleurs chrétiens", "syndicat", null, /\bCFTC\b/],
+  // étudiants, lycéens
+  ["UNEF", "Union nationale des étudiants de France", "syndicat", null, /\bUNEF\b/],
+  ["Union étudiante", "Union étudiante", "syndicat", null, /Union [ée]tudiante/],
+  ["FAGE", "Fédération des associations générales étudiantes", "syndicat", null, /\bFAGE\b/],
+  ["USL", "Union syndicale lycéenne", "syndicat", null, /\bUSL\b|Union syndicale lyc[ée]enne/],
+  ["La Voix lycéenne", "La Voix lycéenne", "syndicat", null, /Voix lyc[ée]enne/],
+  // agriculteurs
+  ["FNSEA", "FNSEA", "syndicat", null, /\bFNSEA\b/],
+  ["Jeunes Agriculteurs", "Jeunes Agriculteurs", "syndicat", null, /Jeunes [Aa]griculteurs/],
+  ["Coordination rurale", "Coordination rurale", "syndicat", null, /Coordination rurale/],
+  ["Confédération paysanne", "Confédération paysanne", "syndicat", null, /Conf[ée]d[ée]ration paysanne/],
+  // police
+  ["Alliance", "Alliance Police nationale", "syndicat", null, /Alliance[- ]Police|syndicat Alliance/],
+  ["Unité SGP", "Unité SGP Police", "syndicat", null, /Unit[ée] SGP/],
+  // partis
+  ["LFI", "La France insoumise", "parti", "Gauche radicale", /\bLFI\b|France insoumise|\binsoumis(?:es)?\b/i],
+  ["PS", "Parti socialiste", "parti", "Gauche", /\bPS\b|Parti socialiste/],
+  ["PCF", "Parti communiste français", "parti", "Gauche", /\bPCF\b|Parti communiste/],
+  ["Les Écologistes", "Les Écologistes (ex-EELV)", "parti", "Gauche écologiste", /\bEELV\b|Les [ÉE]cologistes/],
+  ["Place publique", "Place publique", "parti", "Gauche", /Place publique/],
+  ["NPA", "Nouveau Parti anticapitaliste", "parti", "Extrême gauche", /\bNPA\b/],
+  ["LO", "Lutte ouvrière", "parti", "Extrême gauche", /Lutte ouvri[eè]re/],
+  ["Renaissance", "Renaissance", "parti", "Centre", /\bRenaissance\b(?! du)/],
+  ["MoDem", "Mouvement démocrate", "parti", "Centre", /\bMoDem\b/],
+  ["Horizons", "Horizons", "parti", "Centre droit", /\bHorizons\b/],
+  ["LR", "Les Républicains", "parti", "Droite", /\bLR\b|Les R[ée]publicains/],
+  ["RN", "Rassemblement national", "parti", "Extrême droite", /\bRN\b|Rassemblement national/],
+  ["Reconquête", "Reconquête", "parti", "Extrême droite", /Reconqu[êe]te/],
+  ["Les Patriotes", "Les Patriotes", "parti", "Souverainiste", /Les Patriotes/],
+  ["DLF", "Debout la France", "parti", "Droite souverainiste", /Debout la France/],
+  ["UPR", "Union populaire républicaine", "parti", "Souverainiste", /\bUPR\b/],
+  ["Action française", "Action française", "parti", "Extrême droite", /Action fran[çc]aise/],
+  // collectifs et associations
+  ["Gilets jaunes", "Gilets jaunes", "collectif", null, /[Gg]ilets? jaunes?/],
+  ["Extinction Rebellion", "Extinction Rebellion", "collectif", null, /Extinction Rebellion|\bXR\b/],
+  ["Soulèvements de la Terre", "Les Soulèvements de la Terre", "collectif", null, /Soul[èe]vements de la [Tt]erre/],
+  ["Dernière Rénovation", "Dernière Rénovation", "collectif", null, /Derni[èe]re R[ée]novation/],
+  ["Attac", "Attac", "collectif", null, /\bAttac\b/],
+  ["NousToutes", "NousToutes", "collectif", null, /Nous ?Toutes/],
+  ["LDH", "Ligue des droits de l'Homme", "collectif", null, /\bLDH\b|Ligue des droits de l/],
+  ["SOS Racisme", "SOS Racisme", "collectif", null, /SOS Racisme/],
+  ["Urgence Palestine", "Urgence Palestine", "collectif", null, /Urgence Palestine/],
+  ["Inter-LGBT", "Inter-LGBT", "collectif", null, /Inter-?LGBT/],
+  ["Manif pour tous", "La Manif pour tous / Syndicat de la famille", "collectif", null, /Manif pour tous|Syndicat de la famille/],
+  ["Némésis", "Collectif Némésis", "collectif", null, /N[ée]m[ée]sis/],
+  ["Greenpeace", "Greenpeace", "collectif", null, /Greenpeace/],
+  ["Act Up", "Act Up", "collectif", null, /Act[- ]Up/],
+  ["Intersyndicale", "Intersyndicale", "syndicat", null, /[Ii]ntersyndicale/]
+].map(([sigle, nom, type, famille, re]) => ({ sigle, nom, type, famille, re }));
 
-/* ---------- Grille principale ---------- */
-main{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,1fr);gap:16px;padding:0 24px}
-@media (max-width:960px){main{grid-template-columns:1fr;padding:0 12px}}
-.panel{background:linear-gradient(180deg,var(--panel) 0%,var(--bg2) 100%);border:1px solid var(--line);border-radius:10px;min-width:0}
-.mapwrap{position:relative;padding:12px 14px 14px;overflow:hidden}
-.mapwrap::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 55% at 50% 50%,rgba(77,163,255,.07),transparent 70%);pointer-events:none}
-.filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;position:relative;z-index:1}
-.sep{width:1px;height:22px;background:var(--line2);margin:0 4px}
-.chip{font:500 13px var(--body);padding:5px 11px;border:1px solid var(--line2);background:var(--bg2);color:var(--ink);border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
-.chip[aria-pressed="false"]{opacity:.45}
-.chip[aria-pressed="true"]{border-color:var(--muted)}
-.chip i{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:0 0 6px currentColor}
-.chip.depf{background:var(--ink);color:var(--bg);font-weight:600}
-.chip:focus-visible,.btn:focus-visible,a:focus-visible,.marker:focus-visible,select:focus-visible,input:focus-visible,.item:focus-visible,#feed .it:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.pulse{fill:none;stroke-width:1.6;transform-box:fill-box;transform-origin:center;animation:pulse 2.4s ease-out infinite}
-@keyframes pulse{from{transform:scale(1);opacity:.9}to{transform:scale(3.4);opacity:0}}
-.legend{position:absolute;left:8px;bottom:8px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px;background:rgba(11,19,32,.82);backdrop-filter:blur(6px);padding:9px 11px;border:1px solid var(--line);border-radius:8px;z-index:1}
-.legend span{display:flex;align-items:center;gap:7px}
-.legend i{width:9px;height:9px;border-radius:50%;box-shadow:0 0 6px currentColor}
-.legend .grad{width:130px;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--land),var(--ember),var(--crit))}
-
-/* ---------- Timeline ---------- */
-.timeline{position:relative;z-index:1;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;margin-top:6px;padding:10px 12px;background:rgba(7,16,27,.6);border:1px solid var(--line);border-radius:8px}
-.tl-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--line2);background:var(--panel2);color:var(--ink);cursor:pointer;display:grid;place-items:center;font-size:15px}
-.tl-btn:hover{border-color:var(--muted)}
-.tl-mid{position:relative;min-width:0}
-.tl-spark{display:block;width:100%;height:28px}
-.tl-mid input{width:100%;margin:2px 0 0;accent-color:var(--crit);cursor:pointer}
-.tl-labels{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
-.tl-now{font-family:var(--cond);font-weight:700;font-size:20px;line-height:1.05;text-align:right;min-width:118px}
-.tl-now small{display:block;font-family:var(--body);font-weight:500;font-size:11.5px;color:var(--muted)}
-.tl-now.live{color:var(--crit)}
-.tl-speed{font:600 12px var(--body);background:none;border:1px solid var(--line2);color:var(--muted);border-radius:4px;padding:2px 6px;cursor:pointer;margin-top:3px}
-
-/* ---------- Détail ---------- */
-#detail{position:absolute;right:20px;top:58px;width:min(350px,calc(100% - 40px));max-height:calc(100% - 160px);overflow:auto;background:rgba(15,26,42,.94);backdrop-filter:blur(8px);border:1px solid var(--line2);border-top:3px solid var(--crit);border-radius:8px;padding:12px 14px;box-shadow:0 18px 40px rgba(0,0,0,.45);display:none;z-index:2}
-#detail.on{display:block}
-#detail h3{margin:4px 0 8px;font-family:var(--cond);font-weight:700;font-size:22px;line-height:1.1;padding-right:16px}
-#detail .row:first-of-type{padding-right:22px}
-#detail .row{font-size:13px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
-#detail .close{position:absolute;right:8px;top:6px;border:0;background:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
-#detail ol{margin:10px 0 0;padding:0;list-style:none}
-#detail ol li{padding:8px 0;border-top:1px solid var(--line);font-size:13.5px}
-#detail ol a{font-weight:600;text-decoration:none}
-#detail ol a:hover{color:#fff;text-decoration:underline}
-#detail ol small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
-.pill{display:inline-block;font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.05em;text-transform:uppercase;padding:1px 7px;border-radius:3px;color:#0B1320}
-
-/* ---------- Fil ---------- */
-aside{display:flex;flex-direction:column}
-h2{font-family:var(--cond);font-weight:700;font-size:19px;letter-spacing:.03em;text-transform:uppercase;margin:0;padding:14px 16px 8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-h2 small{font-family:var(--body);font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted);font-size:12.5px}
-#feed{list-style:none;margin:0;padding:0 8px 8px;overflow:auto;max-height:calc(74vh + 90px)}
-#feed li+li{border-top:1px solid var(--line)}
-#feed li.new{animation:flash 3s ease-out}
-@keyframes flash{from{background:color-mix(in srgb,var(--crit) 22%,transparent)}to{background:transparent}}
-#feed .it{display:grid;grid-template-columns:46px 1fr;gap:12px;width:100%;padding:11px 8px;cursor:pointer;border-radius:6px;text-align:left;background:none;border:0;color:inherit;font:inherit}
-#feed .it:hover,#feed li.sel .it{background:rgba(255,255,255,.04)}
-.time{font-family:var(--cond);font-weight:700;font-size:18px;line-height:1;text-align:right;padding-top:2px}
-.time small{display:block;font-family:var(--body);font-size:11px;font-weight:500;color:var(--muted);margin-top:3px}
-.ft{font-weight:600;font-size:14.5px;line-height:1.3;display:flex;gap:8px}
-.ft .dot{flex:none;width:8px;height:8px;border-radius:50%;margin-top:6px;box-shadow:0 0 8px currentColor}
-.fm{font-size:12.5px;color:var(--muted);margin-top:4px;padding-left:16px}
-.badge{display:inline-block;border:1px solid var(--line2);border-radius:3px;padding:0 5px;font-size:11.5px;margin-left:4px;color:var(--ink)}
-.empty{padding:18px;color:var(--muted);font-size:14px}
-
-/* ---------- Stats ---------- */
-.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;padding:16px 24px 0}
-@media (max-width:1100px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:620px){.stats{grid-template-columns:1fr;padding:12px 12px 0}}
-.card{padding:0 16px 16px}
-.card h2{padding-left:0;padding-right:0}
-.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.kpi b{display:block;font-family:var(--cond);font-size:52px;font-weight:800;line-height:.9}
-.kpi span{font-size:12.5px;color:var(--muted)}
-.gauge{margin-top:16px}
-.gauge .track{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--eleve),var(--grave),var(--crit));position:relative}
-.gauge .needle{position:absolute;top:-5px;width:4px;height:18px;background:#fff;border-radius:2px;box-shadow:0 0 10px #fff;transition:left .6s}
-.gauge .lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:5px}
-.gauge .val,.trend{font-size:14px;margin-top:8px}
-.chart{width:100%;height:auto;display:block}
-.chart text{fill:var(--muted);font-family:var(--body);font-size:10.5px}
-.hb{display:grid;grid-template-columns:minmax(80px,130px) 1fr 28px;gap:8px;align-items:center;font-size:13px;margin:7px 0}
-.hb .t{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
-.hb .f{height:100%;background:linear-gradient(90deg,var(--ember),var(--crit));border-radius:4px;transition:width .5s}
-.hb em{font-style:normal;text-align:right;font-family:var(--cond);font-weight:700;font-size:16px}
-.hb button{all:unset;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hb button:hover{color:#fff;text-decoration:underline}
-
-#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(150%);visibility:hidden;background:var(--crit);color:#fff;padding:10px 18px;border-radius:6px;font-family:var(--cond);font-weight:700;font-size:18px;letter-spacing:.03em;transition:transform .35s;z-index:10;max-width:90vw;box-shadow:0 0 30px color-mix(in srgb,var(--crit) 50%,transparent)}
-#toast.on{transform:translateX(-50%) translateY(0);visibility:visible}
-dialog{border:1px solid var(--line2);border-radius:10px;background:var(--panel);color:var(--ink);width:min(560px,92vw);padding:18px 20px}
-dialog::backdrop{background:rgba(0,0,0,.6)}
-dialog h3{margin:0 0 6px;font-family:var(--cond);font-size:24px;text-transform:uppercase}
-dialog label{display:block;font-size:13.5px;font-weight:600;margin:14px 0 4px}
-dialog input,dialog select{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line2);border-radius:5px;padding:7px 9px;width:100%}
-dialog .hint{font-size:12.5px;color:var(--muted);margin:4px 0 0}
-dialog .acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:18px}
-#srcList{font-size:13px;margin:8px 0 0;padding:0;list-style:none;max-height:180px;overflow:auto}
-#srcList li{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)}
-footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900px}
-
-@media (max-width:620px){
-  .legend{position:static;margin-top:8px;flex-direction:row;flex-wrap:wrap;gap:4px 12px}
-  #detail{position:relative;right:auto;top:auto;width:auto;max-height:none;margin-top:10px}
-  .timeline{grid-template-columns:auto 1fr}
-  .tl-now{grid-column:1/-1;text-align:left}
-  #clock{font-size:24px}
-  .tl-labels span:not(:first-child):not(:last-child){display:none}
-}
-@media (prefers-reduced-motion:reduce){
-  .pulse,.ticker .tag i,.status .live.on i{animation:none}
-  .pulse{opacity:0}
-  .ticker .track{animation:none;position:static;overflow:auto}
-}
-
-/* ---------- Carte détaillée (Leaflet) ---------- */
-.mapbox{position:relative;margin-top:8px}
-#lmap{height:min(72vh,780px);min-height:420px;border-radius:8px;background:#0B1320;border:1px solid var(--line)}
-.leaflet-container{background:#0B1320;font-family:var(--body)}
-.darktiles{filter:invert(1) hue-rotate(195deg) brightness(.82) contrast(.92) saturate(.45)}
-.leaflet-bar{border:1px solid var(--line2)!important;box-shadow:none!important}
-.leaflet-bar a{background:rgba(11,19,32,.9)!important;color:var(--ink)!important;border-bottom-color:var(--line2)!important;width:36px!important;height:36px!important;line-height:36px!important;font:700 20px var(--cond)!important}
-.leaflet-bar a:hover{background:var(--panel2)!important}
-.leaflet-control-attribution{background:rgba(11,19,32,.75)!important;color:var(--muted)!important;font-size:10.5px}
-.leaflet-control-attribution a{color:#9CC8FF!important}
-.leaflet-tooltip.dtip{background:#07101B;border:1px solid var(--line2);color:var(--ink);font:500 12.5px var(--body);box-shadow:0 6px 18px rgba(0,0,0,.4);border-radius:5px}
-.leaflet-tooltip.dtip::before{display:none}
-.leaflet-interactive.depsel{stroke:#fff}
-/* points d'incidents */
-.mk{position:relative}
-.mk i{position:absolute;inset:0;border-radius:50%;background:var(--c);box-shadow:0 0 0 1.5px #0B1320,0 0 12px 3px color-mix(in srgb,var(--c) 65%,transparent)}
-.mk.fresh::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--c);animation:ring 2.4s ease-out infinite}
-.mk.old{opacity:.5}
-.mk.sel i{box-shadow:0 0 0 2.5px #fff,0 0 18px 5px color-mix(in srgb,var(--c) 70%,transparent)}
-.mk.drop i{animation:drop .8s cubic-bezier(.2,.9,.3,1.25)}
-.mk.drop::before{content:"";position:absolute;left:50%;bottom:50%;width:2px;height:120px;margin-left:-1px;background:linear-gradient(to top,var(--c),transparent);filter:drop-shadow(0 0 4px var(--c));animation:streak .8s ease-out forwards;transform-origin:bottom}
-@keyframes ring{from{transform:scale(1);opacity:.9}to{transform:scale(3.4);opacity:0}}
-@keyframes drop{0%{transform:translateY(-60px) scale(.3);opacity:0}70%{opacity:1}100%{transform:none}}
-@keyframes streak{0%{transform:scaleY(1);opacity:1}100%{transform:scaleY(0);opacity:0}}
-/* en cours : manifs et interventions */
-.lv{display:flex;align-items:center;gap:5px;white-space:nowrap;transform:translate(-9px,-9px)}
-.lv b{flex:none;width:18px;height:18px;border-radius:50%;position:relative;display:grid;place-items:center;font:700 10px var(--body);color:#fff}
-.lv span{font:800 11px var(--cond);letter-spacing:.08em;padding:2px 6px;border-radius:3px;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.5)}
-.lv-manif b{background:#9B5CFF;box-shadow:0 0 0 2px #0B1320,0 0 16px 4px rgba(155,92,255,.7)}
-.lv-manif b::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid #B88BFF;animation:ring 2s ease-out infinite}
-.lv-manif span{background:#7C3AED}
-.lv-interv b{animation:gyro .9s steps(1) infinite;box-shadow:0 0 0 2px #0B1320}
-.lv-interv span{background:#0E7490}
-@keyframes gyro{0%{background:#FF3B4E;box-shadow:0 0 0 2px #0B1320,0 0 20px 6px rgba(255,59,78,.85)}50%{background:#3B82F6;box-shadow:0 0 0 2px #0B1320,0 0 20px 6px rgba(59,130,246,.85)}}
-.lv.sel span{outline:2px solid #fff}
-.livebar{position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 80px)}
-.livebar button{font:700 13px var(--cond);letter-spacing:.06em;text-transform:uppercase;padding:6px 10px;border-radius:6px;border:1px solid var(--line2);background:rgba(7,16,27,.88);backdrop-filter:blur(6px);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:7px}
-.livebar button[aria-pressed="false"]{opacity:.5}
-.livebar .dotm{width:9px;height:9px;border-radius:50%;background:#9B5CFF;box-shadow:0 0 8px #9B5CFF}
-.livebar .doti{width:9px;height:9px;border-radius:50%;animation:gyro .9s steps(1) infinite}
-.livebar .zero{opacity:.55}
-.legend{position:absolute;left:10px;bottom:24px;z-index:1000;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px;background:rgba(11,19,32,.85);backdrop-filter:blur(6px);padding:9px 11px;border:1px solid var(--line);border-radius:8px}
-#detail{z-index:1100}
-/* section en cours dans le fil */
-#liveList{list-style:none;margin:0 8px 6px;padding:0;border:1px solid color-mix(in srgb,#9B5CFF 40%,var(--line));border-radius:8px;background:rgba(124,58,237,.07)}
-#liveList:empty{display:none}
-#liveList li+li{border-top:1px solid var(--line)}
-#liveList button{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:auto 1fr;gap:10px;width:100%;padding:9px 10px;font-size:14px;line-height:1.3}
-#liveList button:hover{background:rgba(255,255,255,.04)}
-#liveList button:focus-visible{outline:2px solid var(--focus)}
-#liveList .tag{font:800 11px var(--cond);letter-spacing:.08em;padding:2px 6px;border-radius:3px;color:#fff;height:fit-content;margin-top:1px}
-#liveList small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
-.liveh{font:700 13px var(--cond);letter-spacing:.1em;color:#C4A5FF;padding:2px 18px 6px;display:flex;align-items:center;gap:8px}
-.liveh i{width:8px;height:8px;border-radius:50%;background:#9B5CFF;box-shadow:0 0 8px #9B5CFF;animation:blink 1.4s infinite}
-/* manifestations */
-.manifwrap{padding:16px 24px 0}
-@media (max-width:620px){.manifwrap{padding:12px 12px 0}}
-.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;padding:0 16px 16px}
-.mcard{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:8px;padding:12px 14px;border:1px solid var(--line2);border-left:3px solid #9B5CFF;border-radius:8px;background:rgba(124,58,237,.06)}
-.mcard:hover,.mcard.sel{background:rgba(124,58,237,.14)}
-.mcard:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.mcard .city{font:800 19px var(--cond);text-transform:uppercase;letter-spacing:.04em;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.mcard .city small{font:600 12px var(--body);color:#C4A5FF;text-transform:none;letter-spacing:0;white-space:nowrap}
-.mcard .mt{font-size:14px;line-height:1.3}
-.orgs{display:flex;flex-wrap:wrap;gap:5px}
-.org{font:700 12.5px var(--cond);letter-spacing:.04em;padding:2px 7px;border-radius:4px;border:1px solid}
-.org.syndicat{color:#FBBF24;border-color:rgba(251,191,36,.45);background:rgba(251,191,36,.08)}
-.org.parti{color:#E2E8F0;border-color:rgba(226,232,240,.4);background:rgba(226,232,240,.06)}
-.org.collectif{color:#5EEAD4;border-color:rgba(94,234,212,.45);background:rgba(94,234,212,.08)}
-.org em{font-style:normal;font-weight:500;opacity:.8;margin-left:5px;font-family:var(--body);font-size:11px;letter-spacing:0}
-.org.none{color:var(--muted);border-color:var(--line2)}
-.mroute{font-size:13px}
-.mroute b{color:#C4A5FF;font-weight:600}
-.mmotif{font-size:13px;color:var(--muted)}
-.mfoot{font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
-.mtabs{display:flex;gap:6px;padding:0 16px 10px}
-.mtabs button{font:700 13px var(--cond);letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border-radius:6px;border:1px solid var(--line2);background:var(--bg2);color:var(--muted);cursor:pointer}
-.mtabs button[aria-selected="true"]{color:#fff;border-color:#9B5CFF;background:rgba(124,58,237,.25)}
-.mday{grid-column:1/-1;font:700 14px var(--cond);letter-spacing:.08em;text-transform:uppercase;color:#C4A5FF;margin-top:4px}
-.mcard.plan{border-left-color:#5B4B8A;background:rgba(255,255,255,.02)}
-.mcard .when{font:800 15px var(--cond);color:#C4A5FF;letter-spacing:.03em}
-.pl{display:flex;align-items:center;gap:5px;white-space:nowrap;transform:translate(-8px,-8px)}
-.pl b{width:16px;height:16px;border-radius:50%;border:2.5px solid #B88BFF;background:rgba(11,19,32,.85);box-shadow:0 0 10px rgba(155,92,255,.6)}
-.pl span{font:700 10.5px var(--cond);letter-spacing:.06em;color:#E9DDFF;background:rgba(11,19,32,.85);border:1px solid #5B4B8A;padding:1px 5px;border-radius:3px}
-.livebar .dotp{width:9px;height:9px;border-radius:50%;border:2px solid #B88BFF}
-.mempty{padding:0 18px 16px;color:var(--muted);font-size:14px}
-.mroute-line{stroke-dasharray:10 8;animation:dash 1.2s linear infinite}
-@keyframes dash{to{stroke-dashoffset:-18}}
-.rpin{font:800 11px var(--cond);color:#fff;background:#7C3AED;border:2px solid #0B1320;border-radius:50%;width:22px;height:22px;display:grid;place-items:center;box-shadow:0 0 12px rgba(155,92,255,.8)}
-.rpin.end{background:#0B1320;border-color:#B88BFF;color:#C4A5FF}
-.dsec{margin-top:10px;font-size:13.5px}
-.dsec h4{margin:0 0 4px;font:700 12px var(--cond);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.dsec ul{margin:0;padding-left:18px}
-@media (max-width:620px){#lmap{height:62vh;min-height:360px}.legend{position:static;margin-top:8px;flex-direction:row;flex-wrap:wrap;gap:4px 12px}}
-@media (prefers-reduced-motion:reduce){.mk.fresh::after,.lv-manif b::after,.lv-interv b,.livebar .doti,.liveh i{animation:none}.mk.drop i,.mk.drop::before{animation:none}.mk.drop::before{display:none}}
-
-</style>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-</head>
-<body>
-<div class="ticker" aria-label="Derniers faits graves">
-  <div class="tag"><i></i>FLASH</div>
-  <div class="rail"><div class="track" id="ticker"></div></div>
-</div>
-
-<header>
-  <h1>Veille France<small>Incidents graves, manifestations et interventions en direct</small></h1>
-  <div class="status" id="status">Chargement…</div>
-  <div class="tools">
-    <span id="clock"></span>
-    <button class="btn" id="notifBtn">Activer les alertes</button>
-    <button class="btn" id="settingsBtn">Réglages</button>
-  </div>
-</header>
-<div id="banner"></div>
-
-<main>
-  <section class="panel mapwrap" aria-label="Carte des incidents">
-    <div class="filters" id="filters"></div>
-    <div class="mapbox">
-      <div id="lmap" aria-label="Carte de France détaillée"></div>
-      <div class="livebar" id="livebar"></div>
-      <div class="legend" id="legend"></div>
-    </div>
-    <div class="timeline" aria-label="Rejouer les 7 derniers jours">
-      <button class="tl-btn" id="playBtn" aria-label="Rejouer">▶</button>
-      <div class="tl-mid">
-        <svg class="tl-spark" id="spark" viewBox="0 0 600 28" preserveAspectRatio="none"></svg>
-        <input type="range" id="scrub" min="0" max="168" step="1" value="168" aria-label="Moment affiché">
-        <div class="tl-labels" id="tlLabels"></div>
-      </div>
-      <div class="tl-now live" id="tlNow">EN DIRECT<small>bouge le curseur pour remonter le temps</small></div>
-    </div>
-    <div id="detail" role="dialog" aria-live="polite"></div>
-  </section>
-  <aside class="panel">
-    <h2>Fil des faits <small id="feedCount"></small></h2>
-    <div class="liveh" id="liveH" hidden><i></i>EN COURS</div>
-    <ul id="liveList"></ul>
-    <ul id="feed"></ul>
-  </aside>
-</main>
-
-<div class="manifwrap"><section class="panel" aria-label="Manifestations en cours">
-  <h2>Manifestations <small id="manifCount"></small></h2>
-  <div class="mtabs" role="tablist"><button role="tab" id="tabLive" aria-selected="true">En cours</button><button role="tab" id="tabPlan" aria-selected="false">Prévues</button></div>
-  <div class="mgrid" id="manifGrid"></div>
-</section></div>
-
-<section class="stats">
-  <div class="panel card">
-    <h2>En chiffres <small id="periodLbl"></small></h2>
-    <div class="kpis" id="kpis"></div>
-    <div class="gauge">
-      <div class="track"><div class="needle" id="needle"></div></div>
-      <div class="lbl"><span>Calme</span><span>Tendu</span><span>Critique</span></div>
-      <div class="val" id="gval"></div>
-    </div>
-  </div>
-  <div class="panel card">
-    <h2>Violence en temps réel <small id="chartLbl"></small></h2>
-    <svg class="chart" id="timeChart" viewBox="0 0 340 170"></svg>
-    <div class="trend" id="trend"></div>
-  </div>
-  <div class="panel card">
-    <h2>Par type</h2>
-    <div id="typeChart"></div>
-  </div>
-  <div class="panel card">
-    <h2>Départements les plus touchés</h2>
-    <div id="depChart"></div>
-  </div>
-</section>
-
-<footer>Un robot relit les flux RSS des journaux et les posts Bluesky toutes les 5 à 10 minutes, reconnaît la commune parmi les 35 000 de France, classe la gravité, repère les manifestations et interventions signalées comme en cours, et regroupe les articles qui parlent du même fait. « En cours » veut dire signalé par la presse il y a moins de 2 à 4 heures : il n'existe pas de flux officiel en temps réel des interventions, donc un événement peut être déjà terminé. Tout est détecté à partir des mots du titre, l'article fait foi. Fond de carte © les contributeurs OpenStreetMap.</footer>
-
-<dialog id="settings">
-  <h3>Réglages des alertes</h3>
-  <p class="hint">Les alertes du navigateur s'affichent quand cette page est ouverte. Pour les recevoir sur ton téléphone même page fermée, suis la partie « Alertes push » du README.</p>
-  <label for="sevSel">M'alerter à partir de</label>
-  <select id="sevSel"><option value="crit">Mort(s) uniquement</option><option value="grave">Blessés graves et plus</option><option value="eleve">Toutes les violences</option></select>
-  <label for="liveSel">Manifestations et interventions en cours</label>
-  <select id="liveSel"><option value="0">Ne pas m'alerter</option><option value="interv">M'alerter pour les interventions</option><option value="all">M'alerter pour les manifs et les interventions</option></select>
-  <label for="depInp">Départements surveillés</label>
-  <input id="depInp" placeholder="ex. 75, 93, 13 (vide = toute la France)">
-  <p class="hint">Numéros séparés par des virgules.</p>
-  <label for="soundSel">Son</label>
-  <select id="soundSel"><option value="1">Bip à chaque alerte</option><option value="0">Silencieux</option></select>
-  <label>État des sources au dernier passage du robot</label>
-  <ul id="srcList"></ul>
-  <div class="acts">
-    <button class="btn" id="closeSet">Annuler</button>
-    <button class="btn on" id="saveSet">Enregistrer</button>
-  </div>
-</dialog>
-<div id="toast" role="status"></div>
-
-<script>
-const SEV={crit:{lbl:"Mort(s)",w:3,c:"var(--crit)",hex:"#FF3B4E"},grave:{lbl:"Blessés graves",w:2,c:"var(--grave)",hex:"#FF9F1C"},eleve:{lbl:"Violences",w:1,c:"var(--eleve)",hex:"#4DA3FF"}};
-const KIND={manif:{lbl:"Manif",long:"Manifestation",hex:"#9B5CFF",win:3},intervention:{lbl:"Intervention",long:"Intervention en cours",hex:"#0E7490",win:2}};
-const PERIODS={6:"6 h",24:"24 h",48:"48 h",168:"7 jours"};
-const ls={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
-let DATA={events:[],feeds:[],updated:null}, depByCode={}, depLayers={};
-let period=ls.get("vf_period",24), mode=ls.get("vf_mode","both"), active=new Set(Object.keys(SEV));
-let showLive=Object.assign({manif:true,intervention:true,planned:true},ls.get("vf_live",{}));
-let manifTab="live";
-let depFilter=null, selected=null, knownIds=null, lastFetch=0, fetchOk=false;
-let alertCfg=Object.assign({on:false,sev:"crit",deps:[],sound:true,live:"0"},ls.get("vf_alerts",{}));
-let cursor=null, playing=null, speed=1, dropIds=new Set();
-const now=()=>cursor??Date.now();
-const isViol=e=>!!SEV[e.sev];
-const isLive=(e,T=now())=>{if(!e.kind||!KIND[e.kind])return false;const last=e.updated||e.date;const w=(e.ongoing?4:KIND[e.kind].win)*3600e3;return last<=T&&T-last<=w;};
-
-/* ---------- Carte détaillée ---------- */
-const FR_BOUNDS=[[41.3,-5.3],[51.15,9.65]];
-const map=L.map("lmap",{zoomSnap:.25,zoomDelta:.75,wheelPxPerZoomLevel:90,minZoom:4.5,maxZoom:18,zoomControl:false,attributionControl:true,worldCopyJump:false,maxBounds:[[38,-12],[54,16]],maxBoundsViscosity:.6});
-L.control.zoom({position:"bottomright",zoomInTitle:"Zoomer",zoomOutTitle:"Dézoomer"}).addTo(map);
-const ResetCtl=L.Control.extend({options:{position:"bottomright"},onAdd(){const d=L.DomUtil.create("div","leaflet-bar");const a=L.DomUtil.create("a","",d);a.href="#";a.title="Vue entière";a.setAttribute("role","button");a.setAttribute("aria-label","Vue entière");a.textContent="⤢";L.DomEvent.on(a,"click",ev=>{L.DomEvent.preventDefault(ev);depFilter=null;render();map.flyToBounds(FR_BOUNDS,{duration:.6});});L.DomEvent.disableClickPropagation(d);return d;}});
-new ResetCtl().addTo(map);
-map.fitBounds(FR_BOUNDS);
-map.attributionControl.setPrefix(false);
-map.createPane("labels");map.getPane("labels").style.zIndex=450;map.getPane("labels").style.pointerEvents="none";
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,className:"darktiles",attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
-const depGroup=L.geoJSON(null,{style:()=>({color:"#3A5578",weight:1,fillColor:"#17263A",fillOpacity:0}),onEachFeature:(f,layer)=>{
-  const code=f.properties.code;depLayers[code]=layer;
-  layer.bindTooltip(()=>{const n=depByCode[code]?._n||0;return`${f.properties.nom} (${code}) · ${n} fait${n>1?"s":""}`;},{sticky:true,className:"dtip",direction:"top",offset:[0,-8]});
-  layer.on("click",()=>setDep(depFilter===code?null:code));
-  layer.on("mouseover",()=>layer.setStyle({weight:2,color:"#9CC8FF"}));
-  layer.on("mouseout",()=>styleDeps());
-}}).addTo(map);
-const routeGroup=L.layerGroup().addTo(map), mkGroup=L.layerGroup().addTo(map), liveGroup=L.layerGroup().addTo(map);
-map.on("zoomend",()=>styleDeps());
-function setDep(code){depFilter=code;closeDetail(false);render();
-  if(code&&depLayers[code]) map.flyToBounds(depLayers[code].getBounds(),{padding:[30,30],duration:.6});
-  else map.flyToBounds(FR_BOUNDS,{duration:.6});}
-
-// Couleur de chaleur : terre → braise → rouge
-const lerp=(a,b,t)=>a.map((v,i)=>Math.round(v+(b[i]-v)*t));
-const LAND=[23,38,58],EMBER=[255,107,44],RED=[255,59,78];
-const heat=t=>{const c=t<.5?lerp(LAND,EMBER,.25+t*1.3):lerp(EMBER,RED,(t-.5)*2);return`rgb(${c})`;};
-let heatScore={},heatMax=4;
-function styleDeps(){
-  const z=map.getZoom(), op=z<7?.62:z<9?.42:z<11?.22:.1;
-  Object.entries(depLayers).forEach(([c,l])=>{const s=heatScore[c]||0,sel=c===depFilter;
-    l.setStyle({color:sel?"#FFFFFF":"#3A5578",weight:sel?2.5:(z<8?.8:1.3),opacity:z<11?.9:.6,fillColor:s?heat(Math.sqrt(s/heatMax)):"#17263A",fillOpacity:mode!=="points"&&s?op:0});});
-}
-function hashJ(id){let h=0;for(const c of id)h=(h*31+c.charCodeAt(0))|0;return[((h&255)/255-.5)*.008,(((h>>8)&255)/255-.5)*.011];}
-const ll=e=>{const[a,b]=hashJ(e.id);const k=e.area||e.precise?0:1;return[e.lat+a*k,e.lon+b*k];};
-const hasPos=e=>e.lat!=null&&e.lon!=null;
-
-function drawMarkers(vis){
-  mkGroup.clearLayers();
-  if(mode==="heat") return;
-  const T=now();
-  [...vis].filter(hasPos).sort((a,b)=>SEV[a.sev].w-SEV[b.sev].w||a.date-b.date).forEach(e=>{
-    const age=T-e.date, size=Math.round(11+SEV[e.sev].w*3+Math.min(6,(e.articles.length-1)*2));
-    const cls=["mk",age<3*3600e3?"fresh":"",age>24*3600e3?"old":"",selected===e.id?"sel":"",dropIds.has(e.id)&&!reduced?"drop":""].join(" ");
-    const m=L.marker(ll(e),{icon:L.divIcon({className:"",html:`<div class="${cls}" style="--c:${SEV[e.sev].hex};width:${size}px;height:${size}px"><i></i></div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]}),title:`${e.title} · ${placeLbl(e)}`,keyboard:true,riseOnHover:true,zIndexOffset:SEV[e.sev].w*100});
-    m.on("click",()=>select(e.id));m.addTo(mkGroup);
-  });
-}
-const orgTxt=e=>(e.manif?.orgs||[]).slice(0,3).map(o=>o.sigle).join(", ");
-function orgBadges(e,full){const o=e.manif?.orgs||[];if(!o.length)return`<span class="org none">Organisateurs non identifiés</span>`;
-  return o.map(x=>`<span class="org ${x.type}" title="${escH(x.nom)}${x.famille?" · "+escH(x.famille)+" (classement usuel de la presse)":""}">${escH(x.sigle)}${x.famille&&full!==false?`<em>${escH(x.famille)}</em>`:""}</span>`).join("");}
-function drawRoutes(list){
-  routeGroup.clearLayers();
-  list.filter(e=>e.kind==="manif"&&showLive.manif&&e.manif).forEach(e=>{
-    const m=e.manif;
-    if(m.route&&m.route.length>1){
-      L.polyline(m.route,{color:"#9B5CFF",weight:12,opacity:.18,interactive:false}).addTo(routeGroup);
-      const pl=L.polyline(m.route,{color:"#C4A5FF",weight:4,opacity:.95,className:"mroute-line"}).addTo(routeGroup);
-      pl.on("click",()=>select(e.id));
-    }
-    if(m.from?.lat!=null) L.marker([m.from.lat,m.from.lon],{icon:L.divIcon({className:"",html:'<div class="rpin">D</div>',iconSize:[22,22],iconAnchor:[11,11]}),title:"Départ : "+m.from.label,zIndexOffset:900}).on("click",()=>select(e.id)).addTo(routeGroup);
-    if(m.to?.lat!=null) L.marker([m.to.lat,m.to.lon],{icon:L.divIcon({className:"",html:'<div class="rpin end">A</div>',iconSize:[22,22],iconAnchor:[11,11]}),title:"Arrivée : "+m.to.label,zIndexOffset:900}).on("click",()=>select(e.id)).addTo(routeGroup);
-  });
-}
-/* ---------- Manifs prévues ---------- */
-const pWin=p=>p.hasTime?[p.start-30*60e3,(p.end&&p.end>p.start?p.end:p.start+3*3600e3)]:[p.start-2*3600e3,p.start+6*3600e3];
-const plannedLiveNow=(T=now())=>(DATA.planned||[]).filter(p=>{const[a,b]=pWin(p);return T>=a&&T<=b&&(!depFilter||p.dep===depFilter);});
-const plannedNext=(T=now())=>(DATA.planned||[]).filter(p=>pWin(p)[0]>T&&(!depFilter||p.dep===depFilter)).sort((a,b)=>a.start-b.start);
-const whenLbl=p=>{const d=new Date(p.start);const day=dayLbl(p.start)==="auj."?"Aujourd'hui":dayLbl(p.start)==="hier"?"Hier":d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});return{day:day.charAt(0).toUpperCase()+day.slice(1),time:p.hasTime?hhmm(p.start).replace(":","h"):"heure non précisée"};};
-const shortWhen=p=>{const d=new Date(p.start);const w=dayLbl(p.start)==="auj."?"AUJ":d.toLocaleDateString("fr-FR",{weekday:"short"}).replace(".","").toUpperCase();return`${w}${p.hasTime?" "+d.getHours()+"H"+(d.getMinutes()?String(d.getMinutes()).padStart(2,"0"):""):""}`;};
-const planGroup=L.layerGroup().addTo(map);
-function drawPlanned(liveP,nextP){
-  planGroup.clearLayers();
-  if(!showLive.planned) return;
-  const T=now();
-  nextP.filter(p=>p.lat!=null&&p.start-T<7*864e5).forEach(p=>{
-    L.marker([p.lat,p.lon],{icon:L.divIcon({className:"",html:`<div class="pl"><b></b><span>${escH(shortWhen(p))}</span></div>`,iconSize:null,iconAnchor:[0,0]}),title:`Prévue · ${p.title}`,zIndexOffset:500,keyboard:true}).on("click",()=>select(p.id)).addTo(planGroup);
-  });
-  liveP.filter(p=>p.lat!=null).forEach(p=>{
-    L.marker([p.lat,p.lon],{icon:L.divIcon({className:"",html:`<div class="lv lv-manif"><b>✊</b><span>PRÉVUE · EN COURS</span></div>`,iconSize:null,iconAnchor:[0,0]}),title:p.title,zIndexOffset:950,keyboard:true}).on("click",()=>select(p.id)).addTo(planGroup);
-  });
-}
-function drawLive(list){
-  liveGroup.clearLayers(); drawRoutes(list);
-  list.filter(hasPos).filter(e=>showLive[e.kind]).forEach(e=>{
-    const k=KIND[e.kind];
-    const html=`<div class="lv lv-${e.kind==="manif"?"manif":"interv"}${selected===e.id?" sel":""}"><b>${e.kind==="manif"?"✊":""}</b><span>${e.ongoing?"EN COURS · ":""}${k.lbl.toUpperCase()}${orgTxt(e)?" · "+escH(orgTxt(e)):""}</span></div>`;
-    const m=L.marker(ll(e),{icon:L.divIcon({className:"",html,iconSize:null,iconAnchor:[0,0]}),title:`${k.long} · ${e.title}`,zIndexOffset:1000,keyboard:true});
-    m.on("click",()=>select(e.id));m.addTo(liveGroup);
-  });
-}
-
-/* ---------- Données ---------- */
-async function load(){
-  try{
-    const r=await fetch("data/data.json?t="+Date.now(),{cache:"no-store"});
-    if(!r.ok) throw new Error(r.status);
-    const d=await r.json(); fetchOk=true; lastFetch=Date.now();
-    const ids=new Set(d.events.map(e=>e.id));
-    const fresh=knownIds?d.events.filter(e=>!knownIds.has(e.id)):[];
-    knownIds=ids; DATA=d;
-    document.getElementById("banner").classList.remove("on");
-    buildTimeline();
-    if(fresh.length){
-      const nv=fresh.filter(isViol).length, nl=fresh.filter(e=>isLive(e)).length;
-      toast([nv?`${nv} nouveau${nv>1?"x":""} fait${nv>1?"s":""}`:"",nl?`${nl} en cours`:""].filter(Boolean).join(" · ")||"Mise à jour");
-      notify(fresh);
-    }
-    if(cursor===null){dropIds=new Set(fresh.map(e=>e.id));setTimeout(()=>{dropIds.clear();},1500);}
-    render(fresh.map(e=>e.id));
-  }catch(err){
-    fetchOk=false;
-    const b=document.getElementById("banner");
-    b.innerHTML=location.protocol==="file:"?"Ouvre cette page via GitHub Pages (ou un petit serveur local) : un navigateur refuse de lire data.json depuis un fichier ouvert en double-clic.":"Impossible de lire les données pour l'instant, nouvel essai dans une minute.";
-    b.classList.add("on");
-  }
-}
-
-/* ---------- Filtres ---------- */
-function buildFilters(){
-  const f=document.getElementById("filters");f.innerHTML="";
-  const chip=(html,pressed,on,extra="")=>{const b=document.createElement("button");b.className="chip "+extra;b.setAttribute("aria-pressed",pressed);b.innerHTML=html;b.onclick=on;f.appendChild(b);return b;};
-  Object.entries(SEV).forEach(([k,v])=>chip(`<i style="background:${v.c};color:${v.c}"></i>${v.lbl} <span data-n="${k}"></span>`,active.has(k),e=>{active.has(k)?active.delete(k):active.add(k);e.currentTarget.setAttribute("aria-pressed",active.has(k));render();}));
-  f.appendChild(Object.assign(document.createElement("span"),{className:"sep"}));
-  Object.entries(PERIODS).forEach(([h,l])=>chip(l,+h===period,()=>{period=+h;ls.set("vf_period",period);buildFilters();render();}));
-  f.appendChild(Object.assign(document.createElement("span"),{className:"sep"}));
-  [["both","Points + chaleur"],["points","Points"],["heat","Chaleur"]].forEach(([m,l])=>chip(l,m===mode,()=>{mode=m;ls.set("vf_mode",mode);buildFilters();render();}));
-  const dc=document.createElement("span");dc.id="depChip";f.appendChild(dc);
-}
-
-/* ---------- Rendu ---------- */
-const escH=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const safeUrl=u=>/^https?:\/\//i.test(u||"")?u:"#";
-function ago(t){const m=Math.round((Date.now()-t)/60000);if(m<1)return"à l'instant";if(m<60)return`il y a ${m} min`;const h=Math.round(m/60);if(h<24)return`il y a ${h} h`;return new Date(t).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})+" à "+new Date(t).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});}
-const hhmm=t=>new Date(t).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
-const dayLbl=t=>{const d=new Date(t),n=new Date();if(d.toDateString()===n.toDateString())return"auj.";const y=new Date(n-864e5);if(d.toDateString()===y.toDateString())return"hier";return d.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});};
-const placeLbl=e=>e.place?(e.area?e.place:`${e.place}${e.dep?" ("+e.dep+")":""}`):"lieu non détecté";
-const inPeriod=()=>{const T=now();return DATA.events.filter(e=>isViol(e)&&e.date<=T&&T-e.date<=period*3600e3);};
-
-function render(newIds=[]){
-  const T=now(), per=inPeriod(), sevF=per.filter(e=>active.has(e.sev)), vis=depFilter?sevF.filter(e=>e.dep===depFilter):sevF;
-  document.querySelectorAll("[data-n]").forEach(s=>s.textContent=per.filter(e=>e.sev===s.dataset.n&&(!depFilter||e.dep===depFilter)).length);
-  const dc=document.getElementById("depChip");
-  dc.innerHTML=depFilter?`<button class="chip depf" aria-pressed="true">${escH(depByCode[depFilter]?.nom||depFilter)} ×</button>`:"";
-  if(depFilter) dc.firstChild.onclick=()=>setDep(null);
-  heatScore={};const cnt={};sevF.forEach(e=>{if(e.dep){heatScore[e.dep]=(heatScore[e.dep]||0)+SEV[e.sev].w;cnt[e.dep]=(cnt[e.dep]||0)+1;}});
-  heatMax=Math.max(4,...Object.values(heatScore));
-  Object.keys(depByCode).forEach(c=>depByCode[c]._n=cnt[c]||0);
-  styleDeps(); drawMarkers(vis);
-  // en cours
-  const live=DATA.events.filter(e=>isLive(e,T)&&(!depFilter||e.dep===depFilter)).sort((a,b)=>(b.updated||b.date)-(a.updated||a.date));
-  drawLive(live); buildLiveUI(live);
-  document.getElementById("legend").innerHTML=(mode!=="heat"?Object.values(SEV).map(v=>`<span style="display:flex;align-items:center;gap:7px"><i style="width:9px;height:9px;border-radius:50%;background:${v.c};box-shadow:0 0 6px ${v.hex}"></i>${v.lbl}</span>`).join(""):"")+(mode!=="points"?`<span style="margin-top:4px">Intensité par département</span><span style="width:130px;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--land),var(--ember),var(--crit))"></span>`:"");
-  // fil
-  const feed=document.getElementById("feed");feed.innerHTML="";
-  document.getElementById("feedCount").textContent=`${vis.length} sur ${PERIODS[period]}${cursor!==null?" · rejeu":""}`;
-  if(!vis.length) feed.innerHTML=`<li class="empty">${DATA.events.length?"Rien sur cette période avec ces filtres.":"En attente du premier passage du robot."}</li>`;
-  vis.slice(0,250).forEach(e=>{
-    const li=document.createElement("li");li.id="f-"+e.id;
-    if(selected===e.id)li.classList.add("sel");if(newIds.includes(e.id))li.classList.add("new");
-    const n=e.articles.length,c=SEV[e.sev].hex;
-    li.innerHTML=`<button class="it"><span class="time">${hhmm(e.date)}<small>${dayLbl(e.date)}</small></span><span><div class="ft"><span class="dot" style="background:${c};color:${c}"></span>${escH(e.title)}</div><div class="fm">${escH(placeLbl(e))} · ${escH(e.articles[0].src)}${n>1?`<span class="badge">${n} sources</span>`:""}${e.witness?.length?`<span class="badge" style="color:#7DB8FF">+${e.witness.length} Bluesky</span>`:""}</div></span></button>`;
-    li.querySelector("button").onclick=()=>select(e.id);
-    feed.appendChild(li);
-  });
-  stats(vis,sevF);
-  buildTicker();
-  if(selected&&!DATA.events.find(x=>x.id===selected)&&!(DATA.planned||[]).find(x=>x.id===selected)) closeDetail(false);
-}
-
-function buildLiveUI(live){
-  const liveP=plannedLiveNow().filter(p=>!live.some(e=>e.kind==="manif"&&e.place&&p.place&&e.place===p.place)), nextP=plannedNext();
-  drawPlanned(liveP,nextP);
-  const nm=live.filter(e=>e.kind==="manif").length+liveP.length, ni=live.filter(e=>e.kind==="intervention").length, np=nextP.filter(p=>p.start-now()<7*864e5).length;
-  const bar=document.getElementById("livebar");
-  bar.innerHTML=`<button data-k="manif" aria-pressed="${showLive.manif}" class="${nm?"":"zero"}"><span class="dotm"></span>${nm} manif${nm>1?"s":""} en cours</button><button data-k="intervention" aria-pressed="${showLive.intervention}" class="${ni?"":"zero"}"><span class="doti"></span>${ni} intervention${ni>1?"s":""}</button><button data-k="planned" aria-pressed="${showLive.planned}" class="${np?"":"zero"}"><span class="dotp"></span>${np} prévue${np>1?"s":""} (7 j)</button>`;
-  bar.querySelectorAll("button").forEach(b=>b.onclick=()=>{showLive[b.dataset.k]=!showLive[b.dataset.k];ls.set("vf_live",showLive);render();});
-  buildManifPanel(live.filter(e=>e.kind==="manif"),liveP,nextP);
-  const list=document.getElementById("liveList"), shown=live.filter(e=>e.kind==="intervention"&&showLive.intervention);
-  document.getElementById("liveH").hidden=!shown.length;
-  list.innerHTML=shown.slice(0,12).map(e=>`<li><button data-id="${e.id}"><span class="tag" style="background:${e.kind==="manif"?"#7C3AED":"#0E7490"}">${KIND[e.kind].lbl.toUpperCase()}</span><span>${escH(e.title)}<small>${escH(placeLbl(e))} · signalé ${ago(e.updated||e.date)}${e.ongoing?" · « en cours »":""}</small></span></button></li>`).join("");
-  list.querySelectorAll("button").forEach(b=>b.onclick=()=>select(b.dataset.id));
-}
-
-function planCard(p,live){
-  const w=whenLbl(p);
-  return`<button class="mcard plan${selected===p.id?" sel":""}" data-id="${p.id}"><div class="city">${escH(p.place||"National / lieu à préciser")}<small>${live?"en cours selon l'agenda":(p.dep&&depByCode[p.dep]?escH(depByCode[p.dep].nom):"")}</small></div>
-    ${live?"":`<div class="when">${escH(w.time)}</div>`}<div class="orgs">${p.orgs?.length?p.orgs.map(o=>`<span class="org ${o.type}" title="${escH(o.nom)}">${escH(o.sigle)}${o.famille?`<em>${escH(o.famille)}</em>`:""}</span>`).join(""):`<span class="org none">Organisateurs non identifiés</span>`}</div>
-    <div class="mt">${escH(p.title)}</div>${p.where?`<div class="mroute"><b>Lieu</b> ${escH(p.where)}</div>`:""}
-    <div class="mfoot"><span>${p.origin==="agenda"?"agenda militant":"annonce presse"}</span><span>${p.sources.length} source${p.sources.length>1?"s":""}</span></div></button>`;
-}
-function buildManifPanel(ms,liveP=[],nextP=[]){
-  const g=document.getElementById("manifGrid"), tl=document.getElementById("tabLive"), tp=document.getElementById("tabPlan");
-  tl.textContent=`En cours (${ms.length+liveP.length})`; tp.textContent=`Prévues (${nextP.length})`;
-  tl.setAttribute("aria-selected",manifTab==="live");tp.setAttribute("aria-selected",manifTab==="plan");
-  tl.onclick=()=>{manifTab="live";render();};tp.onclick=()=>{manifTab="plan";render();};
-  const bind=()=>g.querySelectorAll(".mcard").forEach(b=>b.onclick=()=>{select(b.dataset.id);document.getElementById("lmap").scrollIntoView({behavior:"smooth",block:"center"});});
-  if(manifTab==="plan"){
-    document.getElementById("manifCount").textContent=nextP.length?"agendas militants et annonces dans la presse":"";
-    if(!nextP.length){g.innerHTML=`<p class="mempty">Aucune manifestation annoncée pour l'instant${depFilter?" dans ce département":""}.</p>`;return;}
-    let html="",last="";
-    nextP.slice(0,80).forEach(p=>{const d=whenLbl(p).day;if(d!==last){html+=`<div class="mday">${escH(d)}</div>`;last=d;}html+=planCard(p,false);});
-    g.innerHTML=html;bind();return;
-  }
-  document.getElementById("manifCount").textContent=ms.length+liveP.length?"signalées ces dernières heures ou prévues maintenant":"";
-  if(!ms.length&&!liveP.length){g.innerHTML=`<p class="mempty">Aucune manifestation en cours en ce moment${depFilter?" dans ce département":""}. Regarde l'onglet « Prévues » pour les prochaines.</p>`;return;}
-  g.innerHTML=liveP.map(p=>planCard(p,true)).join("")+ms.map(e=>{const m=e.manif||{};
-    const route=m.from||m.to?`<div class="mroute">${m.from?`<b>Départ</b> ${escH(m.from.label)}`:""}${m.from&&m.to?" → ":""}${m.to?`<b>Arrivée</b> ${escH(m.to.label)}`:""}</div>`:"";
-    return`<button class="mcard${selected===e.id?" sel":""}" data-id="${e.id}"><div class="city">${escH(e.place||"Lieu inconnu")}<small>${m.rdv?"rdv "+m.rdv+" · ":""}signalée ${ago(e.updated||e.date)}</small></div>
-      <div class="orgs">${orgBadges(e)}</div><div class="mt">${escH(e.title)}</div>${route}
-      ${m.motifs?.length?`<div class="mmotif">${escH(m.motifs.slice(0,2).join(" · "))}</div>`:""}
-      <div class="mfoot">${m.foule?`<span>${escH(m.foule)}</span>`:""}<span>${e.articles.length} source${e.articles.length>1?"s":""}</span>${e.witness?.length?`<span style="color:#7DB8FF">${e.witness.length} témoignage${e.witness.length>1?"s":""} Bluesky</span>`:""}${m.route?"<span>parcours tracé</span>":""}</div></button>`;}).join("");
-  g.querySelectorAll(".mcard").forEach(b=>b.onclick=()=>{select(b.dataset.id);document.getElementById("lmap").scrollIntoView({behavior:"smooth",block:"center"});});
-}
-
-function buildTicker(){
-  const T=now();
-  const top=DATA.events.filter(e=>e.date<=T&&(e.sev==="crit"||e.sev==="grave"||isLive(e,T))).sort((a,b)=>(b.updated||b.date)-(a.updated||a.date)).slice(0,4);
-  const box=document.getElementById("ticker");
-  const key=top.map(e=>e.id).join();
-  if(box.dataset.k===key) return; box.dataset.k=key;
-  if(!top.length){box.innerHTML=`<span class="item"><em>Aucun fait grave récent</em></span>`;return;}
-  const col=e=>SEV[e.sev]?.hex||KIND[e.kind]?.hex||"#9B5CFF";
-  const one=top.map(e=>`<button class="item" data-id="${e.id}"><span class="dot" style="background:${col(e)};box-shadow:0 0 8px ${col(e)}"></span><b>${escH((e.place||"").toUpperCase())}</b>${isLive(e,T)?"<em style='color:#C4A5FF;font-style:normal'>EN COURS</em> ":""}${escH(e.title)}<em>${ago(e.updated||e.date)}</em></button>`).join("");
-  box.innerHTML=one+one;
-  box.querySelectorAll(".item").forEach(b=>b.onclick=()=>select(b.dataset.id));
-}
-
-function selectPlanned(p){
-  const w=whenLbl(p),d=document.getElementById("detail");d.style.borderTopColor="#B88BFF";
-  d.innerHTML=`<button class="close" aria-label="Fermer">×</button>
-    <div class="row"><span><span class="pill" style="background:#5B4B8A;color:#fff">Manif prévue</span></span><span>${p.origin==="agenda"?"agenda militant":"annonce presse"}</span></div>
-    <h3>${escH(p.title)}</h3>
-    <div class="row"><span>${escH(w.day)} · ${escH(w.time)}</span><span>${escH(p.place||"lieu à préciser")}${p.dep?" ("+escH(p.dep)+")":""}</span></div>
-    ${p.where?`<div class="dsec"><h4>Lieu de rendez-vous</h4>${escH(p.where)}</div>`:""}
-    <div class="dsec"><h4>Organisateurs cités</h4><div class="orgs">${p.orgs?.length?p.orgs.map(o=>`<span class="org ${o.type}" title="${escH(o.nom)}">${escH(o.sigle)}${o.famille?`<em>${escH(o.famille)}</em>`:""}</span>`).join(""):`<span class="org none">non identifiés</span>`}</div></div>
-    <div class="dsec"><h4>Sources</h4></div>
-    <ol>${p.sources.map(s=>`<li><a href="${escH(safeUrl(s.url))}" target="_blank" rel="noopener">${escH(s.src)}</a></li>`).join("")}</ol>
-    <p style="color:var(--muted);font-size:12px;margin:8px 0 0">Annonce non confirmée : horaires et lieux peuvent changer, vérifie auprès de la source.</p>`;
-  d.classList.add("on");d.querySelector(".close").onclick=()=>closeDetail(true);
-  render();
-  if(p.lat!=null) map.flyTo([p.lat,p.lon],Math.max(map.getZoom(),p.precise?15:11),{duration:.7});
-}
-function select(id){
-  const pl=(DATA.planned||[]).find(x=>x.id===id);if(pl){selected=id;return selectPlanned(pl);}
-  selected=id;const e=DATA.events.find(x=>x.id===id);if(!e)return;
-  const col=SEV[e.sev]?.hex||KIND[e.kind]?.hex||"#9B5CFF";
-  const badge=SEV[e.sev]?`<span class="pill" style="background:${col}">${SEV[e.sev].lbl}</span>`:`<span class="pill" style="background:${col};color:#fff">${KIND[e.kind].long}</span>`;
-  const d=document.getElementById("detail");d.style.borderTopColor=col;
-  d.innerHTML=`<button class="close" aria-label="Fermer">×</button>
-    <div class="row"><span>${badge} ${SEV[e.sev]?escH(e.type):""}</span><span>${ago(e.date)}</span></div>
-    <h3>${escH(e.title)}</h3>
-    <div class="row"><span>${escH(placeLbl(e))}${e.dep&&depByCode[e.dep]&&!e.area?" · "+escH(depByCode[e.dep].nom):""}</span><span>${e.articles.length} article${e.articles.length>1?"s":""}</span></div>
-    ${isLive(e)?`<div class="row" style="margin-top:6px;color:#C4A5FF">Dernier signalement ${ago(e.updated||e.date)}, peut être déjà terminé</div>`:""}
-    ${e.manif?`<div class="dsec"><h4>Organisateurs cités</h4><div class="orgs">${orgBadges(e)}</div></div>
-      ${e.manif.from||e.manif.to?`<div class="dsec"><h4>Parcours</h4>${e.manif.from?`Départ : ${escH(e.manif.from.label)}<br>`:""}${e.manif.to?`Arrivée : ${escH(e.manif.to.label)}`:""}${e.manif.route?"":`<br><span style="color:var(--muted)">tracé non disponible</span>`}</div>`:""}
-      ${e.manif.motifs?.length?`<div class="dsec"><h4>Motifs relevés dans la presse</h4><ul>${e.manif.motifs.map(x=>`<li>${escH(x)}</li>`).join("")}</ul></div>`:""}
-      ${e.manif.rdv||e.manif.foule?`<div class="dsec"><h4>Infos</h4>${e.manif.rdv?`Rendez-vous ${escH(e.manif.rdv)}`:""}${e.manif.rdv&&e.manif.foule?" · ":""}${e.manif.foule?escH(e.manif.foule):""}</div>`:""}
-      <div class="dsec"><h4>Sources</h4></div>`:""}
-    <ol>${e.articles.map(a=>`<li><a href="${escH(safeUrl(a.url))}" target="_blank" rel="noopener">${escH(a.t)}</a><small>${escH(a.src)} · ${ago(a.date)}</small></li>`).join("")}</ol>
-    ${e.witness?.length?`<div class="dsec"><h4>Sur Bluesky · ${e.witness.length} post${e.witness.length>1?"s":""} en parle${e.witness.length>1?"nt":""}</h4><ul>${[...e.witness].sort((a,b)=>b.date-a.date).slice(0,8).map(w=>`<li><a href="${escH(safeUrl(w.url))}" target="_blank" rel="noopener">Voir le post</a> <span style="color:var(--muted)">${ago(w.date)}</span></li>`).join("")}</ul><p style="color:var(--muted);font-size:12px;margin:4px 0 0">Témoignages non vérifiés, rattachés automatiquement par lieu et sujet.</p></div>`:""}`;
-  d.classList.add("on");d.querySelector(".close").onclick=()=>closeDetail(true);
-  render();
-  if(e.manif?.route?.length>1) map.flyToBounds(L.latLngBounds(e.manif.route),{padding:[60,60],maxZoom:16,duration:.7});
-  else if(hasPos(e)) map.flyTo(ll(e),Math.max(map.getZoom(),e.area?8:(e.precise?15:12)),{duration:.7});
-  const li=document.getElementById("f-"+id);if(li)li.scrollIntoView({block:"nearest",behavior:"smooth"});
-}
-function closeDetail(re){selected=null;document.getElementById("detail").classList.remove("on");if(re)render();}
-
-function stats(vis,sevF){
-  const n=k=>vis.filter(e=>e.sev===k).length, T=now();
-  document.getElementById("periodLbl").textContent=PERIODS[period]+(depFilter?" · "+(depByCode[depFilter]?.nom||depFilter):"");
-  document.getElementById("kpis").innerHTML=`<div class="kpi"><b style="color:var(--crit);text-shadow:0 0 18px color-mix(in srgb,var(--crit) 50%,transparent)">${n("crit")}</b><span>avec mort(s)</span></div><div class="kpi"><b style="color:var(--grave)">${n("grave")}</b><span>blessés, armes</span></div><div class="kpi"><b>${vis.length}</b><span>faits</span></div>`;
-  const base=DATA.events.filter(e=>isViol(e)&&e.date<=T&&(!depFilter||e.dep===depFilter));
-  const s24=base.filter(e=>T-e.date<=24*3600e3).reduce((s,e)=>s+SEV[e.sev].w,0), max=depFilter?15:80, pct=Math.min(100,s24/max*100);
-  document.getElementById("needle").style.left=`calc(${pct}% - 2px)`;
-  document.getElementById("gval").innerHTML=`Indice sur 24 h : <b>${s24}</b> pts · ${pct>66?"situation critique":pct>33?"situation tendue":"calme relatif"}`;
-  const hours=period<=48?period:168, step=hours<=48?1:24, nb=Math.ceil(hours/step);
-  document.getElementById("chartLbl").textContent=step===1?"par heure":"par jour";
-  const end=new Date(T); if(step===1)end.setMinutes(60,0,0); else end.setHours(24,0,0,0);
-  const t0=end.getTime()-nb*step*3600e3, bk=Array.from({length:nb},()=>({crit:0,grave:0,eleve:0}));
-  vis.forEach(e=>{const i=Math.floor((e.date-t0)/(step*3600e3));if(i>=0&&i<nb)bk[i][e.sev]++;});
-  const svg=document.getElementById("timeChart");svg.innerHTML="";const NS="http://www.w3.org/2000/svg";
-  const S=(nm,a)=>{const e=document.createElementNS(NS,nm);for(const k in a)e.setAttribute(k,a[k]);svg.appendChild(e);return e};
-  const top=Math.max(3,...bk.map(b=>b.crit+b.grave+b.eleve)),ch=120,x0=24,bw=(340-x0)/nb;
-  [0,.5,1].forEach(f=>{const y=8+ch-ch*f;S("line",{x1:x0,x2:340,y1:y,y2:y,stroke:"var(--line)"});S("text",{x:0,y:y+4}).textContent=Math.round(top*f);});
-  bk.forEach((b,i)=>{let y=8+ch;["eleve","grave","crit"].forEach(k=>{const h=b[k]/top*ch;if(h>0){y-=h;S("rect",{x:x0+i*bw+bw*.14,y,width:Math.max(1,bw*.72),height:h,fill:SEV[k].hex,rx:1.5});}});});
-  const every=step===1?Math.ceil(nb/6):1;
-  for(let i=0;i<nb;i+=every){const d=new Date(t0+i*step*3600e3);S("text",{x:x0+i*bw+bw/2,y:8+ch+15,"text-anchor":"middle"}).textContent=step===1?d.getHours()+"h":d.toLocaleDateString("fr-FR",{weekday:"short"});}
-  const r6=base.filter(e=>T-e.date<=6*3600e3).length/6, r48=base.filter(e=>T-e.date<=48*3600e3).length/48;
-  document.getElementById("trend").innerHTML=r48?`Rythme des 6 dernières heures : <b>${r6>r48*1.3?"en hausse ↑":r6<r48*.7?"en baisse ↓":"stable"}</b> (${r6.toFixed(1)}/h contre ${r48.toFixed(1)}/h sur 48 h)`:"";
-  const bars=(obj,id,click)=>{const ent=Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,8),m=Math.max(1,...ent.map(e=>e[1]));const box=document.getElementById(id);
-    box.innerHTML=ent.map(([k,v])=>`<div class="hb">${click?`<button data-k="${escH(k)}">${escH(click(k))}</button>`:`<span>${escH(k)}</span>`}<div class="t"><div class="f" style="width:${v/m*100}%"></div></div><em>${v}</em></div>`).join("")||`<p class="empty" style="padding:0">Pas encore de données.</p>`;
-    if(click) box.querySelectorAll("button").forEach(b=>b.onclick=()=>setDep(b.dataset.k));};
-  const ty={},dp={};vis.forEach(e=>ty[e.type]=(ty[e.type]||0)+1);sevF.forEach(e=>{if(e.dep)dp[e.dep]=(dp[e.dep]||0)+1;});
-  bars(ty,"typeChart");bars(dp,"depChart",k=>`${depByCode[k]?.nom||k} (${k})`);
-}
-
-/* ---------- Timeline : rejouer 7 jours ---------- */
-const scrub=document.getElementById("scrub"), playBtn=document.getElementById("playBtn"), tlNow=document.getElementById("tlNow");
-const H=168, t0TL=()=>{const d=new Date();d.setMinutes(0,0,0);return d.getTime()+3600e3-H*3600e3;};
-function buildTimeline(){
-  const base=t0TL(), bk=Array(H).fill(0);
-  DATA.events.filter(isViol).forEach(e=>{const i=Math.floor((e.date-base)/3600e3);if(i>=0&&i<H)bk[i]+=SEV[e.sev].w;});
-  const m=Math.max(1,...bk), sp=document.getElementById("spark");
-  let d="M0,28";bk.forEach((v,i)=>{d+=`L${(i+.5)/H*600},${28-v/m*24}`;});d+="L600,28Z";
-  sp.innerHTML=`<defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF3B4E" stop-opacity=".8"/><stop offset="1" stop-color="#FF3B4E" stop-opacity="0"/></linearGradient></defs><path d="${d}" fill="url(#sg)"/><line id="spl" x1="600" x2="600" y1="0" y2="28" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
-  const Lb=document.getElementById("tlLabels");Lb.innerHTML="";
-  for(let i=0;i<=7;i++){const s=document.createElement("span");s.textContent=i===7?"maintenant":new Date(base+i*24*3600e3).toLocaleDateString("fr-FR",{weekday:"short"});Lb.appendChild(s);}
-}
-function setCursor(v,animate){
-  const live=+v>=H, prevT=now();
-  cursor=live?null:t0TL()+(+v)*3600e3;
-  scrub.value=v;
-  const spl=document.getElementById("spl");if(spl){spl.setAttribute("x1",v/H*600);spl.setAttribute("x2",v/H*600);}
-  tlNow.classList.toggle("live",live);
-  tlNow.innerHTML=live?`EN DIRECT<small>bouge le curseur pour remonter le temps</small>`:`${new Date(cursor).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric"})} ${new Date(cursor).getHours()}h<small>rejeu · ${speed}× <button class="tl-speed" id="spd">vitesse</button></small>`;
-  const spd=document.getElementById("spd");if(spd)spd.onclick=()=>{speed=speed===1?4:speed===4?12:1;if(playing){pause();play();}setCursor(scrub.value);};
-  dropIds=new Set(animate?DATA.events.filter(e=>e.date>prevT&&e.date<=now()).map(e=>e.id):[]);
-  render();
-}
-function play(){
-  if(+scrub.value>=H) setCursor(0);
-  playBtn.textContent="❚❚";playBtn.setAttribute("aria-label","Pause");
-  playing=setInterval(()=>{const v=+scrub.value+1;setCursor(v,true);if(v>=H)pause();},Math.round(420/speed));
-}
-function pause(){clearInterval(playing);playing=null;playBtn.textContent="▶";playBtn.setAttribute("aria-label","Rejouer");}
-playBtn.onclick=()=>playing?pause():play();
-scrub.oninput=()=>{pause();setCursor(scrub.value);};
-
-/* ---------- Alertes navigateur ---------- */
-const sevRank={crit:3,grave:2,eleve:1,info:0};
-function notify(list){
-  if(!alertCfg.on) return;
-  const hits=list.filter(e=>{
-    if(alertCfg.deps.length&&!alertCfg.deps.includes(e.dep)) return false;
-    if(isViol(e)&&sevRank[e.sev]>=sevRank[alertCfg.sev]) return true;
-    return isLive(e)&&(alertCfg.live==="all"||(alertCfg.live==="interv"&&e.kind==="intervention"));
-  });
-  if(!hits.length) return;
-  if(alertCfg.sound) beep();
-  if("Notification" in window && Notification.permission==="granted"){
-    hits.slice(0,5).forEach(e=>{try{const n=new Notification((isLive(e)?"EN COURS · ":"")+e.title,{body:`${placeLbl(e)} · ${e.type} · ${e.articles[0].src}`,tag:e.id});n.onclick=()=>{window.focus();select(e.id);};}catch(_){}});
-  }
-}
-function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.setValueAtTime(.15,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.5);o.connect(g).connect(a.destination);o.start();o.stop(a.currentTime+.5);}catch(_){}}
-const notifBtn=document.getElementById("notifBtn");
-function paintNotif(){notifBtn.textContent=alertCfg.on?"Alertes activées":"Activer les alertes";notifBtn.classList.toggle("on",alertCfg.on);}
-notifBtn.onclick=async()=>{
-  if(alertCfg.on){alertCfg.on=false;}
-  else{
-    if("Notification" in window && Notification.permission==="default"){try{await Notification.requestPermission();}catch(_){}}
-    alertCfg.on=true;
-    toast(!("Notification" in window)||Notification.permission!=="granted"?"Notifications refusées : bip et bandeau seulement":"Alertes activées");
-  }
-  ls.set("vf_alerts",alertCfg);paintNotif();
+/* ---------- Extraction dans le texte ---------- */
+const LIEU = "(?:place|rue|avenue|av\\.|boulevard|bd|cours|quai|esplanade|parvis|pont|gare|porte|square|jardin|parc|rond-point|allées?|promenade|carrefour|préfecture|sous-préfecture|hôtel de ville|mairie|assemblée nationale|sénat|ministère|palais|rectorat|université|campus|lycée|hôpital|CHU|tribunal|conseil (?:départemental|régional))";
+const STOPWORDS = /\s+(?:à|a|ce|cet|cette|ces|dès|vers|pour|contre|en soutien|avant|après|puis|le|ou|où|et|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|demain|aujourd'hui|en fin|en début|à partir|avec|sous|depuis|jusqu|au moment|alors|tandis|afin|ont|sont|a été|était|qui|dans|lors|malgré|sans|entre)(?=[\s,.;:']|$).*$/i;
+const clean = s => s.replace(STOPWORDS, "").replace(/[«»"“”]/g, "").replace(/\s+/g, " ").trim().replace(/[\s,;:.)-]+$/, "");
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+const PLACE = `(${LIEU}(?:\\s+(?:de la|du|des|de l'|d'|de|la|le|l'))?\\s*[A-ZÉÈÀÂÎÔÛÇ0-9][\\wÀ-ÿ'’\\- ]{1,45}|${LIEU})`;
+const RX = {
+  fromTo: new RegExp(`(?:de|depuis|entre)\\s+(?:la |le |l'|les )?${PLACE}\\s+(?:à|a|jusqu'à|jusqu'au|vers|et)\\s+(?:la |le |l'|les )?${PLACE}`, "i"),
+  from: new RegExp(`(?:départ|partir|partira|partiront|partie|parti|partant|s'élancer\\w*|élancé\\w*|rassemblés?|rassemblement|rendez-vous|rdv|réunis|réunies|massés?)\\s+(?:est\\s+(?:prévu|donné)\\s+)?(?:à\\s+\\d{1,2}\\s?h(?:\\d{2})?\\s+)?(?:de la |du |de l'|des |de |depuis (?:la |le |l')?|devant (?:la |le |l')?|sur (?:la |le |l')?|à (?:la |l')?|au |place )?${PLACE}`, "i"),
+  to: new RegExp(`(?:arrivée|arriver|arrivera|arriveront|jusqu'(?:à|au)|en direction (?:de|du|des)|direction|vers|rejoindre|rejoindront|rallier|gagner|se diriger vers|terminer|se terminera|se disperser)\\s+(?:la |le |l'|les |à |au |devant (?:la |le |l')?)?${PLACE}`, "i"),
+  at: new RegExp(`(?:devant|sur)\\s+(?:la |le |l')?${PLACE}`, "i"),
+  any: /((?:[Pp]lace|[Pp]arvis|[Ee]splanade|[Rr]ue|[Aa]venue|[Bb]oulevard|[Qq]uai|[Cc]ours|[Pp]ont|[Pp]orte|[Gg]are)\s+(?:de la |du |des |de l'|d'|de )?[A-ZÉÈÀÂÎÔÛÇ][\wÀ-ÿ'’\-]+(?:\s+(?:de la |du |des |de l'|d'|de )?[A-ZÉÈÀÂÎÔÛÇ0-9][\wÀ-ÿ'’\-]+){0,3})/,
+  fromTo2: /(?:cortège|manifestation|marche|défilé|parcours|ira|iront|partira|partiront|reliera|ralliera|manifesteront|défileront)[^.]{0,30}?\b(?:du|de la|de l'|depuis (?:le |la |l')?)\s*([A-ZÉÈ][\wÀ-ÿ'’\-]+(?:\s[\wÀ-ÿ'’\-]+){0,3}?)\s+(?:à|jusqu'à|jusqu'au|vers|au)\s+((?:la |le |l')?[\wÀ-ÿ'’\-]+(?:\s[\wÀ-ÿ'’\-]+){0,4})/,
+  rdv: /(?:à|dès|vers|rendez-vous à|rdv à|départ à|à partir de)\s+(\d{1,2})\s?h\s?(\d{2})?/i,
+  foule: /(\d{1,3}(?:[\s.  ]\d{3})*|\d+)\s+(manifestants|personnes|participants|tracteurs)(?:[^.]{0,40}?(selon (?:la police|la préfecture|les organisateurs|le ministère de l'Intérieur|la CGT|les syndicats)))?/i,
+  motif: /\b(contre|pour|réclam\w*|dénonc\w*|revendiqu\w*|exig\w*|s'opposer à|s'opposent à|en soutien (?:à|aux?)|soutenir|défendre|protester contre|en hommage à)\s+([^.;:!?()«»"]{4,90})/gi
 };
-const dlg=document.getElementById("settings");
-document.getElementById("settingsBtn").onclick=()=>{
-  document.getElementById("sevSel").value=alertCfg.sev;
-  document.getElementById("liveSel").value=alertCfg.live||"0";
-  document.getElementById("depInp").value=alertCfg.deps.join(", ");
-  document.getElementById("soundSel").value=alertCfg.sound?"1":"0";
-  document.getElementById("srcList").innerHTML=(DATA.feeds||[]).map(f=>`<li><span>${escH(f.name)}</span><span style="color:${f.ok?"var(--ok)":"var(--crit)"}">${f.ok?`OK · ${f.n} lus, ${f.kept} retenus`:"ne répond pas"}</span></li>`).join("")||"<li>Pas encore de passage du robot.</li>";
-  dlg.showModal?dlg.showModal():dlg.setAttribute("open","");
-};
-document.getElementById("closeSet").onclick=()=>dlg.close();
-document.getElementById("saveSet").onclick=()=>{
-  alertCfg.sev=document.getElementById("sevSel").value;
-  alertCfg.live=document.getElementById("liveSel").value;
-  alertCfg.deps=document.getElementById("depInp").value.split(/[,\s;]+/).map(s=>s.trim().toUpperCase()).filter(Boolean).map(s=>/^\d$/.test(s)?"0"+s:s);
-  alertCfg.sound=document.getElementById("soundSel").value==="1";
-  ls.set("vf_alerts",alertCfg);dlg.close();toast("Réglages enregistrés");
-};
+const NOT_MOTIF = /^(la police|les forces de l'ordre|les gendarmes|des heures|plusieurs heures|la première fois|le moment|l'instant)/i;
 
-/* ---------- Statut ---------- */
-function tick(){
-  document.getElementById("clock").textContent=new Date().toLocaleTimeString("fr-FR");
-  const up=DATA.updated?Date.parse(DATA.updated):null, ok=(DATA.feeds||[]).filter(f=>f.ok).length;
-  const next=Math.max(0,Math.round((lastFetch+60e3-Date.now())/1000));
-  const live=`<span class="live ${fetchOk?"on":""}"><i></i>${fetchOk?"EN LIGNE":"HORS LIGNE"}</span>`;
-  document.getElementById("status").innerHTML=up
-    ?`${live}<span>Robot passé <b>${ago(up)}</b></span><span><b>${ok}/${DATA.feeds.length}</b> sources</span><span>Relecture dans <b>${next}s</b></span>`
-    :`${live}<span>Données de départ, le robot n'est pas encore passé</span>`;
-  if(up&&Date.now()-up>40*60e3){const b=document.getElementById("banner");if(!b.classList.contains("on")){b.textContent="Le robot n'a pas tourné depuis plus de 40 minutes : vérifie l'onglet Actions de ton dépôt GitHub.";b.classList.add("on");}}
-}
-function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("on");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("on"),4500);}
-
-/* ---------- Contours des départements ---------- */
-async function loadDeps(){
-  let gj=null;
-  try{const r=await fetch("https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson");if(r.ok)gj=await r.json();}catch(_){}
-  if(!gj){const d=await (await fetch("departements.json")).json();gj={type:"FeatureCollection",features:d.map(x=>({type:"Feature",properties:{code:x.code,nom:x.nom},geometry:{type:"MultiPolygon",coordinates:x.rings.map(r=>[r])}}))};}
-  gj.features.forEach(f=>depByCode[f.properties.code]={nom:f.properties.nom,_n:0});
-  depGroup.addData(gj);
+export function extract(text) {
+  const t = (text || "").replace(/\s+/g, " ");
+  const out = { from: null, to: null, rdv: null, foule: null, motifs: [] };
+  let m = t.match(RX.fromTo);
+  if (m) { out.from = cap(clean(m[1])); out.to = cap(clean(m[2])); }
+  if (!out.from && (m = t.match(RX.from))) out.from = cap(clean(m[1]));
+  if (!out.to && (m = t.match(RX.to))) { const v = cap(clean(m[1])); if (!out.from || norm(v) !== norm(out.from)) out.to = v; }
+  if (!out.from && (m = t.match(RX.at))) out.from = cap(clean(m[1]));
+  if (!out.from && !out.to && (m = t.match(RX.fromTo2))) { out.from = cap(clean(m[1])); out.to = cap(clean(m[2])); }
+  if (!out.from && (m = t.match(RX.any))) out.from = cap(clean(m[1]));
+  if ((m = t.match(RX.rdv))) { const h = +m[1]; if (h >= 5 && h <= 23) out.rdv = `${h}h${m[2] || ""}`; }
+  if ((m = t.match(RX.foule))) out.foule = `${m[1].replace(/[\s.  ]/g, " ").trim()} ${m[2]}${m[3] ? " " + m[3] : ""}`;
+  const seen = new Set();
+  for (const mm of t.matchAll(RX.motif)) {
+    let verb = mm[1].toLowerCase(), obj = mm[2].trim().split(/\s+/).slice(0, 10).join(" ").replace(/[,\s]+$/, "");
+    obj = obj.replace(/,?\s+(?:à l'appel|à l'initiative|selon|a indiqué|ont indiqué|explique|précise).*$/i, "").replace(/[,\s]+$/, "");
+    if (verb === "pour" && /^(rejoindre|se rendre|aller|partir|arriver|rallier|gagner|la première|le moment|l'instant|des raisons)/i.test(obj)) continue;
+    let phrase = `${verb} ${obj}`;
+    const inner = phrase.match(/^pour\s+((?:d[ée]noncer|protester contre|r[ée]clamer|exiger|d[ée]fendre|soutenir|demander|s'opposer à)\s.+)$/i);
+    if (inner) phrase = inner[1];
+    if (NOT_MOTIF.test(obj) || obj.length < 5) continue;
+    const k = norm(phrase).toLowerCase().slice(0, 40);
+    if (seen.has(k)) continue; seen.add(k);
+    out.motifs.push(phrase);
+    if (out.motifs.length >= 3) break;
+  }
+  // un lieu trop vague ("place", "mairie" seul) ne sert à rien sans nom
+  for (const k of ["from", "to"]) if (out[k] && (/^(place|rue|avenue|boulevard|bd|cours|quai|pont|gare|porte|parc|square|jardin|esplanade|parvis|lycée|université|campus|palais|ministère|\d+h\d*)$/i.test(out[k]) || out[k].length < 4)) out[k] = null;
+  return out;
 }
 
-/* ---------- Démarrage ---------- */
-(async()=>{
-  paintNotif(); buildFilters();
-  try{await loadDeps();}catch(_){}
-  await load(); tick();
-  dropIds=new Set(DATA.events.filter(e=>Date.now()-e.date<24*3600e3).map(e=>e.id));render();setTimeout(()=>dropIds.clear(),1500);
-  setInterval(tick,1000); setInterval(load,60e3); setInterval(()=>{if(cursor===null)render();},5*60e3);
-})();
-</script>
-</body>
-</html>
+export function findOrgs(text) {
+  const found = [];
+  for (const o of ORGS) if (o.re.test(text)) found.push({ sigle: o.sigle, nom: o.nom, type: o.type, famille: o.famille });
+  return found.slice(0, 8);
+}
+
+/* ---------- Texte des articles ---------- */
+async function articleText(url) {
+  if (!/^https?:\/\//.test(url) || /news\.google\.|bsky\.app/.test(url)) return "";
+  try {
+    const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; VeilleFrance/1.0)", "Accept-Language": "fr-FR,fr" }, signal: AbortSignal.timeout(12000), redirect: "follow" });
+    if (!r.ok) return "";
+    const html = (await r.text()).slice(0, 600000);
+    const meta = [...html.matchAll(/<meta[^>]+(?:property|name)=["'](?:og:description|description)["'][^>]+content=["']([^"']+)/gi)].map(m => m[1]);
+    const paras = [...html.replace(/<(script|style|noscript)[\s\S]*?<\/\1>/gi, "").matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map(m => m[1].replace(/<[^>]+>/g, " ")).filter(p => p.length > 40).slice(0, 40);
+    return [...meta, ...paras].join(" ").replace(/&nbsp;/g, " ").replace(/&#39;|&apos;|&rsquo;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&eacute;/g, "é").replace(/&egrave;/g, "è").replace(/&agrave;/g, "à").replace(/\s+/g, " ").slice(0, 12000);
+  } catch { return ""; }
+}
+
+/* ---------- Géocodage et tracé ---------- */
+let geoCache = null, lastGeo = 0, geoFile = null, geoBudget = 45;
+export async function initGeo(file, budget = 45) { geoFile = file; geoBudget = budget; if (geoCache) return; try { geoCache = JSON.parse(await fs.readFile(file, "utf8")); } catch { geoCache = {}; } }
+export async function saveGeo() { if (geoFile && geoCache) await fs.writeFile(geoFile, JSON.stringify(geoCache)); }
+const loadCache = file => initGeo(file);
+export async function geocode(place, city, near) {
+  const key = norm(`${place}|${city}`).toLowerCase();
+  if (key in geoCache) return geoCache[key];
+  if (geoBudget-- <= 0) return null;
+  if (process.env.OFFLINE_GEO) { const v = near ? { lat: near.lat + (Math.random() - .5) * .02, lon: near.lon + (Math.random() - .5) * .02 } : null; geoCache[key] = v; return v; }
+  const wait = 1100 - (Date.now() - lastGeo); if (wait > 0) await sleep(wait); lastGeo = Date.now();
+  const p = new URLSearchParams({ q: `${place}, ${city}, France`, format: "jsonv2", limit: "1", countrycodes: "fr", "accept-language": "fr" });
+  if (near) { const d = .25; p.set("viewbox", `${near.lon - d},${near.lat + d},${near.lon + d},${near.lat - d}`); p.set("bounded", "1"); }
+  let v = null;
+  try {
+    const r = await fetch("https://nominatim.openstreetmap.org/search?" + p, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(10000) });
+    if (r.ok) { const j = await r.json(); if (j[0]) v = { lat: +(+j[0].lat).toFixed(5), lon: +(+j[0].lon).toFixed(5) }; }
+  } catch {}
+  geoCache[key] = v; return v;
+}
+async function walkRoute(a, b) {
+  if (process.env.OFFLINE_GEO) return [[a.lat, a.lon], [b.lat, b.lon]];
+  for (const base of ["https://routing.openstreetmap.de/routed-foot/route/v1/driving/", "https://router.project-osrm.org/route/v1/foot/"]) {
+    try {
+      const r = await fetch(`${base}${a.lon},${a.lat};${b.lon},${b.lat}?overview=simplified&geometries=geojson`, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(10000) });
+      if (!r.ok) continue;
+      const j = await r.json(); const c = j?.routes?.[0]?.geometry?.coordinates;
+      if (c?.length) { const step = Math.max(1, Math.ceil(c.length / 150)); return c.filter((_, i) => i % step === 0 || i === c.length - 1).map(([lo, la]) => [+la.toFixed(5), +lo.toFixed(5)]); }
+    } catch {}
+  }
+  return [[a.lat, a.lon], [b.lat, b.lon]];
+}
+
+/* ---------- Programme ---------- */
+export async function enrichManifs(events, { now, cacheFile, maxEvents = 8, log = () => {} }) {
+  if (!geoCache) await loadCache(cacheFile);
+  const todo = events
+    .filter(e => e.kind === "manif" && now - (e.updated || e.date) < 8 * 3600e3)
+    .filter(e => !e.manif || e.manif.n !== e.articles.length)
+    .sort((a, b) => (b.updated || b.date) - (a.updated || a.date))
+    .slice(0, maxEvents);
+  for (const e of todo) {
+    let text = e.articles.map(a => a.t).join(". ") + ". " + (e.desc || "");
+    for (const a of e.articles.slice(0, 3)) text += " " + await articleText(a.url);
+    const x = extract(text), orgs = findOrgs(text);
+    const city = e.place && !e.area ? e.place : null, near = e.lat != null ? { lat: e.lat, lon: e.lon } : null;
+    const m = { n: e.articles.length, orgs, motifs: x.motifs, rdv: x.rdv, foule: x.foule, from: null, to: null, route: null };
+    if (city && x.from) { const g = await geocode(x.from, city, near); if (g) m.from = { label: x.from, ...g }; }
+    if (city && x.to) { const g = await geocode(x.to, city, near); if (g) m.to = { label: x.to, ...g }; }
+    if (!m.from && x.from) m.from = { label: x.from };
+    if (!m.to && x.to) m.to = { label: x.to };
+    if (m.from?.lat != null && m.to?.lat != null) m.route = await walkRoute(m.from, m.to);
+    if (m.from?.lat != null) { e.lat = m.from.lat; e.lon = m.from.lon; e.precise = true; }
+    e.manif = m;
+    log(`  manif ${e.place || "?"} : ${orgs.map(o => o.sigle).join(", ") || "orga ?"} · ${m.from?.label || "?"} → ${m.to?.label || "?"}`);
+  }
+  return todo.length;
+}

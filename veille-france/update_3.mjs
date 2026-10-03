@@ -2,7 +2,8 @@
 // Lancé toutes les 10 minutes par GitHub Actions (voir .github/workflows/update.yml).
 import fs from "node:fs/promises";
 import { XMLParser } from "fast-xml-parser";
-import { enrichManifs } from "./manif.mjs";
+import { enrichManifs, initGeo, saveGeo, geocode, findOrgs } from "./manif.mjs";
+import { fetchPlanned, mergePlanned, futureDate, ANNOUNCE, looksLikeDemo } from "./planned.mjs";
 import { fetchBluesky } from "./bluesky.mjs";
 
 const ROOT = new URL("..", import.meta.url);
@@ -127,7 +128,7 @@ const TYPES = [
 ];
 const SEVW = { crit: 3, grave: 2, eleve: 1, info: 0 };
 // Manifestations et interventions en cours
-const R_MANIF = /\b(manifestation\w*|manifestant\w*|rassemblement\w*|cortege\w*|defile\w*|blocus|blocage\w*|mobilisation\w*|sit-in|marche blanche|piquet de greve|emeute\w*|affrontement\w*|violences urbaines|nuit de violences|occupation d\w*)\b/;
+const R_MANIF = /\b(manifestation\w*|manifestant\w*|manifester|manifesteront|manifestent|appel a la greve|journee de mobilisation|rassemblement\w*|cortege\w*|defile\w*|blocus|blocage\w*|mobilisation\w*|sit-in|marche blanche|piquet de greve|emeute\w*|affrontement\w*|violences urbaines|nuit de violences|occupation d\w*)\b/;
 const R_INTERV = /\b(intervention\w*|raid|gign|bri|operation de (police|gendarmerie)|perimetre de securite|boucle\w*|evacu\w*|prise d.otages?|retranche\w*|alerte a la bombe|colis suspect|chasse a l.homme|traque|pompiers? (mobilise|engage|deploye|sur place)\w*|forces de l.ordre (deploye|mobilise|sur place)\w*|incendie en cours|feu en cours|policiers? deploye\w*|helicoptere de la gendarmerie)\b/;
 const R_ONGOING = /\b(en cours|actuellement|en ce moment|toujours en cours|se poursui\w*|en direct|direct)\b/;
 const R_PAST = /\b(proces|condamne\w*|juge\w*|il y a \d+|la semaine derniere|bilan de|retour sur|anniversaire|commemor\w*)\b/;
@@ -194,6 +195,9 @@ let events = (prev.events || []).filter(e => NOW - e.date <= KEEP_MS);
 const seenLinks = new Set(events.flatMap(e => e.articles.map(a => a.url)));
 const seenTitles = new Set(events.flatMap(e => e.articles.map(a => key(a.t))));
 const feedStatus = [];
+await initGeo(P("data/geocache.json"), +(process.env.GEO_BUDGET || 45));
+let planned = (prev.planned || []).filter(p => p.start > NOW - 8 * 3600e3);
+let plannedNew = 0;
 const newIds = new Set(), escalated = new Set();
 
 const SOURCES = FEEDS.map(f => ({ f, p: fetchText(f.url).then(x => parseFeed(x, f)) }));
@@ -211,6 +215,18 @@ results.forEach((r, i) => {
     const c = classify(it.title, it.desc); if (!c) continue;
     const g = locate(it.title) || locate(it.desc);
     if (c.foreign && (!g || g.area)) continue;
+    // annonce d'une manif à venir : va dans « prévues », pas sur la carte des faits
+    if (c.kind === "manif" && (!it.bsky || it.trusted) && ANNOUNCE.test(low(it.title + " " + it.desc))) {
+      const fd = futureDate(it.title + " " + it.desc, it.date);
+      if (fd && fd.ts > it.date + 2 * 3600e3 && fd.ts < NOW + 30 * 864e5) {
+        const txt = it.title + " " + it.desc;
+        if (mergePlanned(planned, { id: "p" + hash(it.link), title: it.title, start: fd.ts, end: null, hasTime: fd.hasTime,
+          place: g && !g.area ? g.nom : (g ? g.nom : null), dep: g ? g.dep || null : null, lat: g ? g.lat : null, lon: g ? g.lon : null, precise: false,
+          where: null, orgs: findOrgs(txt), sources: [{ src: it.src, url: it.link }], origin: "presse" })) plannedNew++;
+        seenLinks.add(it.link); seenTitles.add(key(it.title)); kept++;
+        continue;
+      }
+    }
     if (!g && !f.keepUnlocated) continue;
     if (it.bsky && !it.trusted) {
       // simple témoignage : rattaché à un fait déjà connu au même endroit, jamais de création
@@ -255,6 +271,19 @@ try {
   if (n) log(`${n} manif(s) analysée(s)`);
 } catch (err) { log("analyse des manifs :", err.message); }
 
+/* ---------- Agendas militants (une fois par heure) ---------- */
+let plannedFetched = prev.plannedFetched || 0, agendaStatus = prev.agendaStatus || null;
+if (cfg.agendas?.enabled !== false && !process.env.FEEDS_OVERRIDE && NOW - plannedFetched > 55 * 60e3) {
+  try {
+    const r = await fetchPlanned({ now: NOW, communes, geocode, locate: t => locate(t), log, instances: cfg.agendas?.demosphere });
+    for (const it of r.items) if (mergePlanned(planned, it)) plannedNew++;
+    plannedFetched = NOW; agendaStatus = { ok: r.ok, total: r.total };
+  } catch (err) { log("agendas :", err.message); }
+}
+planned.sort((a, b) => a.start - b.start); planned = planned.slice(0, 500);
+await saveGeo();
+log(`${planned.length} manifs prévues (${plannedNew} nouvelles)`);
+
 /* ---------- Alertes push (ntfy.sh) ---------- */
 const A = cfg.alerts || {};
 const topic = process.env.NTFY_TOPIC;
@@ -278,7 +307,8 @@ for (const e of events) {
 }
 
 await fs.mkdir(P("data/"), { recursive: true });
-const out = { updated: new Date(NOW).toISOString(), feeds: feedStatus, events };
+if (agendaStatus) feedStatus.push({ name: "Agendas Démosphère", ok: agendaStatus.ok > 0, n: agendaStatus.ok, kept: planned.filter(p => p.origin === "agenda").length });
+const out = { updated: new Date(NOW).toISOString(), feeds: feedStatus, events, planned, plannedFetched, agendaStatus };
 await fs.writeFile(P("data/data.json"), JSON.stringify(out));
 log(`OK · ${feedStatus.filter(f => f.ok).length}/${SOURCES.length} sources · ${witnesses} témoignages Bluesky · ${newIds.size} nouveaux faits · ${escalated.size} aggravés · ${events.length} au total · ${sent} alertes`);
 feedStatus.filter(f => !f.ok).forEach(f => log("  ✗", f.name, f.error));
