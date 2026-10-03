@@ -130,7 +130,10 @@ const TYPES = [
 const SEVW = { crit: 3, grave: 2, eleve: 1, info: 0 };
 // Manifestations et interventions en cours
 const R_MANIF = /\b(manifestation\w*|manifestant\w*|manifester|manifesteront|manifestent|appel a la greve|journee de mobilisation|rassemblement\w*|cortege\w*|defile\w*|blocus|blocage\w*|mobilisation\w*|sit-in|marche blanche|piquet de greve|emeute\w*|affrontement\w*|violences urbaines|nuit de violences|occupation d\w*)\b/;
-const R_INTERV = /\b(intervention\w*|raid|gign|bri|operation de (police|gendarmerie)|perimetre de securite|boucle\w*|evacu\w*|prise d.otages?|retranche\w*|alerte a la bombe|colis suspect|chasse a l.homme|traque|pompiers? (mobilise|engage|deploye|sur place)\w*|forces de l.ordre (deploye|mobilise|sur place)\w*|incendie en cours|feu en cours|policiers? deploye\w*|helicoptere de la gendarmerie)\b/;
+// Intervention en cours : opération des forces de l'ordre (ou des secours) qui se déroule MAINTENANT
+const R_INTERV = /\b(raid|gign|bri|forcene\w*|retranche\w*|prise d.otages?|otages?|braquage|braqueurs?|chasse a l.homme|traque|perimetre de securite|boucle\w*|evacu\w*|colis suspect|alerte a la bombe|alerte (a l.)?attentat|intervention|operation de (police|gendarmerie)|policiers? (deploye|mobilise|sur place|deployes|mobilises)|forces de l.ordre|crs|helicoptere|individu arme|homme arme|tireur|fusillade|charges?|gaz lacrymogenes?|interpellations? en cours)\b/;
+const R_NOW = /\b(en cours|actuellement|en ce moment|a l.instant|toujours (retranche|en cours|sur place|boucle|recherche|en fuite)|depuis (ce matin|cet apres-midi|ce soir|plusieurs heures|\d+ ?h(eures?)?)|en direct|direct|live|se poursui\w*|intervient|interviennent|est retranche|sont retranches|est boucle|sont deployes|sont mobilises|est en cours|encercl\w*|en fuite|recherche(s|nt)? activement|evacue(s|es)? par precaution|alerte en cours|retranche (chez|dans)|(quartier|rue|secteur|zone|gare|centre-ville|immeuble|lycee|college|ecole|magasin) (est )?(boucle|evacue|confine)\w*|confinement)\b/;
+const R_ENDED = /\b(a ete (interpelle|maitrise|arrete|neutralise|libere|interpellee|arretee)|ont ete (interpelles|liberes|arretes|maitrises)|s.est rendu|s.est livre|leve\w*|a pris fin|termine\w*|apres (l.intervention|la prise|le braquage|avoir)|hier|la veille|la nuit derniere|(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche) (soir|matin|apres-midi|dernier)|bilan|retour sur|condamne\w*|mis en examen|sera juge|garde a vue prolongee|enquete ouverte)\b/;
 const R_ONGOING = /\b(en cours|actuellement|en ce moment|toujours en cours|se poursui\w*|en direct|direct)\b/;
 const R_PAST = /\b(proces|condamne\w*|juge\w*|il y a \d+|la semaine derniere|bilan de|retour sur|anniversaire|commemor\w*)\b/;
 // accidents, incendies sans indice criminel, animaux, procès : pas de la violence en cours
@@ -146,14 +149,17 @@ function classify(title, desc) {
   const t = low(title), all = t + " " + low(desc);
   if (NOISE.test(t)) return null;
   if (isExcluded(t)) return null;
-  const kind = R_PAST.test(t) ? null : R_INTERV.test(t) ? "intervention" : R_MANIF.test(t) ? "manif" : null;
-  const ongoing = !!kind && R_ONGOING.test(all);
+  const now = R_NOW.test(t) && !R_ENDED.test(t);
+  const kind = R_PAST.test(t) ? null : (R_INTERV.test(t) && now) ? "intervention" : R_MANIF.test(t) ? "manif" : null;
+  const ongoing = kind === "intervention" ? true : !!kind && R_ONGOING.test(all) && !R_ENDED.test(t);
+  const ended = R_ENDED.test(t);
   let sev = null;
   if (R_CRIT.test(t)) sev = "crit"; else if (R_GRAVE.test(t)) sev = "grave"; else if (R_ELEVE.test(t)) sev = "eleve";
   else if (R_CRIT.test(all) || R_GRAVE.test(all)) sev = "eleve";
   if (!sev && !kind) return null;
-  if (!sev) return { sev: "info", type: kind === "manif" ? "Manifestation" : "Intervention en cours", foreign: FOREIGN.test(t), kind, ongoing };
-  return { sev, type: (TYPES.find(([, r]) => r.test(all)) || ["Autre"])[0], foreign: FOREIGN.test(t), kind, ongoing };
+  if (!sev && kind === "intervention" && !R_NOW.test(t)) return null;
+  if (!sev) return kind ? { sev: "info", type: kind === "manif" ? "Manifestation" : "Intervention en cours", foreign: FOREIGN.test(t), kind, ongoing, ended } : null;
+  return { sev, type: (TYPES.find(([, r]) => r.test(all)) || ["Autre"])[0], foreign: FOREIGN.test(t), kind, ongoing, ended };
 }
 
 /* ---------- Regroupement des articles qui parlent du même fait ---------- */
@@ -224,6 +230,8 @@ results.forEach((r, i) => {
     if (NOW - it.date > KEEP_MS) continue;
     if (seenLinks.has(it.link) || seenTitles.has(key(it.title))) continue;
     const c = classify(it.title, it.desc); if (!c) continue;
+    // une intervention n'est « en cours » que si l'article vient de tomber
+    if (c.kind === "intervention" && NOW - it.date > 90 * 60e3) { c.kind = null; c.ongoing = false; if (c.sev === "info") continue; }
     let g = locate(it.title);
     if (!g || g.area) { const g2 = locate(it.desc); if (g2 && (!g || (!g2.area && g2.dep === g.dep))) g = g2; }
     if (c.foreign && (!g || g.area)) continue;
@@ -263,6 +271,7 @@ results.forEach((r, i) => {
       if (SEVW[c.sev] > SEVW[match.sev]) { match.sev = c.sev; match.title = it.title; escalated.add(match.id); }
       if (c.kind && !match.kind) match.kind = c.kind;
       if (c.ongoing) match.ongoing = true;
+      if (c.ended && match.kind === "intervention" && it.date >= (match.updated || match.date) - 600e3) match.ended = true;
       if (!match.place && g) Object.assign(match, { place: g.nom, dep: g.dep || null, lat: g.lat, lon: g.lon, area: !!g.area });
     } else {
       const ev = { id: hash(it.link + it.title), title: it.title, sev: c.sev, type: c.type, date: it.date, updated: it.date,
