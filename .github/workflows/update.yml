@@ -33,6 +33,20 @@ jobs:
         with:
           node-version: 20
 
+      - name: Rangement des fichiers envoyés au mauvais endroit
+        run: |
+          mkdir -p scripts
+          for f in *.mjs; do
+            [ -e "$f" ] || continue
+            case "$f" in
+              *_[0-9]*.mjs) git rm -q -f "$f" ;;
+              *) git mv -f "$f" "scripts/$f" ;;
+            esac
+          done
+          for f in index_*.html; do [ -e "$f" ] && git rm -q -f "$f"; done
+          printf 'node_modules/\n_site/\n' > .gitignore
+          ls scripts
+
       - run: npm install --no-audit --no-fund
 
       - name: Lecture des flux, regroupement et alertes
@@ -46,7 +60,7 @@ jobs:
         run: |
           git config user.name "veille-bot"
           git config user.email "veille-bot@users.noreply.github.com"
-          git add data/
+          git add -A .
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "Incidents $(date -u +'%d/%m %H:%M') UTC"
           for i in 1 2 3; do
