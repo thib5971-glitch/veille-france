@@ -39,17 +39,23 @@ jobs:
         run: node scripts/update.mjs
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
+          BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
 
       - name: Enregistrement des données dans le dépôt
         run: |
           git config user.name "veille-bot"
           git config user.email "veille-bot@users.noreply.github.com"
           git add data/
-          if ! git diff --cached --quiet; then
-            git commit -m "Incidents $(date -u +'%d/%m %H:%M') UTC"
-            git pull --rebase --autostash || true
-            git push
-          fi
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Incidents $(date -u +'%d/%m %H:%M') UTC"
+          for i in 1 2 3; do
+            git fetch origin main
+            if git rebase -X theirs origin/main && git push origin HEAD:main; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          echo "Enregistrement impossible cette fois, la carte est quand même publiée."
 
       - name: Préparation du site
         run: |
