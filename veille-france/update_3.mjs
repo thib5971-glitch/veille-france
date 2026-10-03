@@ -5,6 +5,7 @@ import { XMLParser } from "fast-xml-parser";
 import { enrichManifs, initGeo, saveGeo, geocode, findOrgs } from "./manif.mjs";
 import { fetchPlanned, mergePlanned, futureDate, ANNOUNCE, looksLikeDemo } from "./planned.mjs";
 import { fetchBluesky } from "./bluesky.mjs";
+import { analyzeVersions } from "./versions.mjs";
 
 const ROOT = new URL("..", import.meta.url);
 const P = f => new URL(f, ROOT);
@@ -270,6 +271,8 @@ try {
   const n = await enrichManifs(events, { now: NOW, cacheFile: P("data/geocache.json"), maxEvents: cfg.manifPerRun || 8, log });
   if (n) log(`${n} manif(s) analysée(s)`);
 } catch (err) { log("analyse des manifs :", err.message); }
+try { await analyzeVersions(events, { now: NOW, maxFetch: cfg.versionsFetchPerRun || 24, log }); }
+catch (err) { log("versions :", err.message); }
 
 /* ---------- Agendas militants (une fois par heure) ---------- */
 let plannedFetched = prev.plannedFetched || 0, agendaStatus = prev.agendaStatus || null;

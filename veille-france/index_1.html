@@ -251,6 +251,29 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
 .mroute b{color:#C4A5FF;font-weight:600}
 .mmotif{font-size:13px;color:var(--muted)}
 .mfoot{font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+/* versions */
+.vbox{margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,.035);border:1px solid var(--line2)}
+.vwarn{display:inline-block;font:800 12px var(--cond);letter-spacing:.08em;color:#0B1320;background:#FFC857;padding:2px 7px;border-radius:3px;margin-bottom:6px}
+.vres{font-size:13.5px;line-height:1.45}
+.vrow{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.vchip{font-size:12px;padding:2px 7px;border-radius:4px;border:1px solid var(--line2);background:var(--bg2);white-space:nowrap}
+.vchip.bad{border-color:#FFC857;color:#FFE3A3}
+.vchip b{font-family:var(--cond);font-size:14px;margin-right:4px}
+.vopp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.vopp>div{padding:6px 8px;border-radius:6px;background:var(--bg2);border:1px solid var(--line2);font-size:12.5px}
+.vopp b{display:block;font:700 14px var(--cond);letter-spacing:.03em;color:#FFE3A3}
+.vtl{list-style:none;margin:6px 0 0;padding:0 0 0 12px;border-left:2px solid var(--line2)}
+.vtl li{position:relative;padding:3px 0 6px;font-size:12.5px}
+.vtl li::before{content:"";position:absolute;left:-17px;top:8px;width:8px;height:8px;border-radius:50%;background:#9CC8FF}
+.vtl time{font:700 13px var(--cond);margin-right:6px}
+.vtl em{font-style:normal;color:#FFE3A3}
+#detail.wide{width:min(440px,calc(100% - 40px))}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;padding:0 16px 16px}
+.vcard{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:7px;padding:12px 14px;border:1px solid var(--line2);border-left:3px solid #FFC857;border-radius:8px;background:rgba(255,200,87,.04)}
+.vcard:hover{background:rgba(255,200,87,.09)}
+.vcard:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.vcard .mt{font-weight:600;font-size:14px;line-height:1.3}
+.vcard p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .mtabs{display:flex;gap:6px;padding:0 16px 10px}
 .mtabs button{font:700 13px var(--cond);letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border-radius:6px;border:1px solid var(--line2);background:var(--bg2);color:var(--muted);cursor:pointer}
 .mtabs button[aria-selected="true"]{color:#fff;border-color:#9B5CFF;background:rgba(124,58,237,.25)}
@@ -324,6 +347,11 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
   <h2>Manifestations <small id="manifCount"></small></h2>
   <div class="mtabs" role="tablist"><button role="tab" id="tabLive" aria-selected="true">En cours</button><button role="tab" id="tabPlan" aria-selected="false">Prévues</button></div>
   <div class="mgrid" id="manifGrid"></div>
+</section></div>
+
+<div class="manifwrap"><section class="panel" aria-label="Le même fait, plusieurs récits">
+  <h2>Le même fait, plusieurs récits <small id="versCount"></small></h2>
+  <div class="vgrid" id="versGrid"></div>
 </section></div>
 
 <section class="stats">
@@ -552,12 +580,12 @@ function render(newIds=[]){
     const li=document.createElement("li");li.id="f-"+e.id;
     if(selected===e.id)li.classList.add("sel");if(newIds.includes(e.id))li.classList.add("new");
     const n=e.articles.length,c=SEV[e.sev].hex;
-    li.innerHTML=`<button class="it"><span class="time">${hhmm(e.date)}<small>${dayLbl(e.date)}</small></span><span><div class="ft"><span class="dot" style="background:${c};color:${c}"></span>${escH(e.title)}</div><div class="fm">${escH(placeLbl(e))} · ${escH(e.articles[0].src)}${n>1?`<span class="badge">${n} sources</span>`:""}${e.witness?.length?`<span class="badge" style="color:#7DB8FF">+${e.witness.length} Bluesky</span>`:""}</div></span></button>`;
+    li.innerHTML=`<button class="it"><span class="time">${hhmm(e.date)}<small>${dayLbl(e.date)}</small></span><span><div class="ft"><span class="dot" style="background:${c};color:${c}"></span>${escH(e.title)}</div><div class="fm">${escH(placeLbl(e))} · ${escH(e.articles[0].src)}${n>1?`<span class="badge">${n} sources</span>`:""}${e.witness?.length?`<span class="badge" style="color:#7DB8FF">+${e.witness.length} Bluesky</span>`:""}${e.versions?.conflict?`<span class="badge" style="color:#FFC857;border-color:rgba(255,200,87,.5)">⚠ versions</span>`:""}</div></span></button>`;
     li.querySelector("button").onclick=()=>select(e.id);
     feed.appendChild(li);
   });
   stats(vis,sevF);
-  buildTicker();
+  buildTicker(); buildVersionsPanel();
   if(selected&&!DATA.events.find(x=>x.id===selected)&&!(DATA.planned||[]).find(x=>x.id===selected)) closeDetail(false);
 }
 
@@ -606,6 +634,35 @@ function buildManifPanel(ms,liveP=[],nextP=[]){
   g.querySelectorAll(".mcard").forEach(b=>b.onclick=()=>{select(b.dataset.id);document.getElementById("lmap").scrollIntoView({behavior:"smooth",block:"center"});});
 }
 
+function versionsHTML(e){
+  const v=e.versions;if(!v)return"";
+  const t=x=>hhmm(x).replace(":","h");
+  const nums=(v.divergences||[]).map(d=>`<div style="margin-top:6px"><span style="color:var(--muted);font-size:12px">${escH(d.label)}${d.rising?" · bilan qui s'alourdit":d.conflict?" · chiffres différents":""}</span><div class="vrow">${d.values.map(x=>`<span class="vchip${d.conflict?" bad":""}"><b>${x.v}</b>${escH(x.src)} · ${t(x.t)}</span>`).join("")}</div></div>`).join("");
+  const foule=(v.foule||[]).length?`<div style="margin-top:6px"><span style="color:var(--muted);font-size:12px">Foule</span><div class="vrow">${v.foule.map(f=>`<span class="vchip"><b>${f.n.toLocaleString("fr-FR")}</b>selon ${f.who==="police"?"la police":f.who==="organisateurs"?"les organisateurs":"un comptage indépendant"}</span>`).join("")}</div></div>`:"";
+  const opp=(v.opposed||[]).map(o=>`<div class="vopp"><div><b>« ${escH(o.a.join(" », « "))} »</b>${escH(o.srcA.join(", "))}</div><div><b>« ${escH(o.b.join(" », « "))} »</b>${escH(o.srcB.join(", "))}</div></div>`).join("");
+  const mots=(v.frames||[]).filter(f=>!f.side||!(v.opposed||[]).length).map(f=>`<span class="vchip" title="${escH(f.srcs.join(", "))}">${escH(f.label)} · ${f.srcs.length}</span>`).join("");
+  const tl=(v.chrono||[]).map(c=>`<li><time>${t(c.t)}</time>${escH(c.src)}${c.add.length?` <em>+ ${escH(c.add.join(", "))}</em>`:""}</li>`).join("");
+  return`<div class="vbox">${v.conflict?`<span class="vwarn">⚠ VERSIONS DIVERGENTES</span>`:""}<div class="dsec" style="margin-top:0"><h4>Fiche automatique</h4><div class="vres">${escH(v.resume)}</div></div>
+    ${nums||foule?`<div class="dsec"><h4>Chiffres par source</h4>${nums}${foule}</div>`:""}
+    ${opp?`<div class="dsec"><h4>Récits opposés</h4>${opp}</div>`:""}
+    ${mots?`<div class="dsec"><h4>Mots employés</h4><div class="vrow">${mots}</div></div>`:""}
+    ${tl&&v.chrono.length>1?`<div class="dsec"><h4>Chronologie</h4><ul class="vtl">${tl}</ul></div>`:""}
+    <p style="color:var(--muted);font-size:11.5px;margin:8px 0 0">Analyse automatique des titres et articles, à vérifier dans les sources.</p></div>`;
+}
+function buildVersionsPanel(){
+  const T=now(),g=document.getElementById("versGrid");
+  const list=DATA.events.filter(e=>e.versions?.conflict&&T-(e.updated||e.date)<48*3600e3&&(!depFilter||e.dep===depFilter)).sort((a,b)=>(b.updated||b.date)-(a.updated||a.date)).slice(0,12);
+  document.getElementById("versCount").textContent=list.length?`${list.length} fait${list.length>1?"s":""} raconté${list.length>1?"s":""} différemment ces dernières 48 h`:"";
+  if(!list.length){g.innerHTML=`<p class="mempty">Aucune divergence repérée entre médias pour l'instant : il faut au moins deux sources sur le même fait.</p>`;return;}
+  g.innerHTML=list.map(e=>{const v=e.versions;const o=(v.opposed||[])[0];
+    return`<button class="vcard" data-id="${e.id}"><div class="city" style="font:800 16px var(--cond);text-transform:uppercase;letter-spacing:.04em;display:flex;justify-content:space-between">${escH(e.place||"")}<small style="font:600 12px var(--body);color:#FFE3A3;text-transform:none">${new Set(e.articles.map(a=>a.src)).size} sources</small></div>
+      <div class="mt">${escH(e.title)}</div>
+      ${o?`<div class="vrow"><span class="vchip bad">« ${escH(o.a[0])} » · ${escH(o.srcA[0])}</span><span class="vchip bad">« ${escH(o.b[0])} » · ${escH(o.srcB[0])}</span></div>`:""}
+      ${(v.divergences||[]).filter(d=>d.conflict).map(d=>`<div class="vrow"><span class="vchip bad">${escH(d.label)} : ${d.values.map(x=>x.v).join(" / ")}</span></div>`).join("")}
+      <p>${escH(v.resume)}</p></button>`;}).join("");
+  g.querySelectorAll(".vcard").forEach(b=>b.onclick=()=>{select(b.dataset.id);document.getElementById("lmap").scrollIntoView({behavior:"smooth",block:"center"});});
+}
+
 function buildTicker(){
   const T=now();
   const top=DATA.events.filter(e=>e.date<=T&&(e.sev==="crit"||e.sev==="grave"||isLive(e,T))).sort((a,b)=>(b.updated||b.date)-(a.updated||a.date)).slice(0,4);
@@ -620,7 +677,7 @@ function buildTicker(){
 }
 
 function selectPlanned(p){
-  const w=whenLbl(p),d=document.getElementById("detail");d.style.borderTopColor="#B88BFF";
+  const w=whenLbl(p),d=document.getElementById("detail");d.style.borderTopColor="#B88BFF";d.classList.remove("wide");
   d.innerHTML=`<button class="close" aria-label="Fermer">×</button>
     <div class="row"><span><span class="pill" style="background:#5B4B8A;color:#fff">Manif prévue</span></span><span>${p.origin==="agenda"?"agenda militant":"annonce presse"}</span></div>
     <h3>${escH(p.title)}</h3>
@@ -645,14 +702,15 @@ function select(id){
     <h3>${escH(e.title)}</h3>
     <div class="row"><span>${escH(placeLbl(e))}${e.dep&&depByCode[e.dep]&&!e.area?" · "+escH(depByCode[e.dep].nom):""}</span><span>${e.articles.length} article${e.articles.length>1?"s":""}</span></div>
     ${isLive(e)?`<div class="row" style="margin-top:6px;color:#C4A5FF">Dernier signalement ${ago(e.updated||e.date)}, peut être déjà terminé</div>`:""}
+    ${versionsHTML(e)}
     ${e.manif?`<div class="dsec"><h4>Organisateurs cités</h4><div class="orgs">${orgBadges(e)}</div></div>
       ${e.manif.from||e.manif.to?`<div class="dsec"><h4>Parcours</h4>${e.manif.from?`Départ : ${escH(e.manif.from.label)}<br>`:""}${e.manif.to?`Arrivée : ${escH(e.manif.to.label)}`:""}${e.manif.route?"":`<br><span style="color:var(--muted)">tracé non disponible</span>`}</div>`:""}
       ${e.manif.motifs?.length?`<div class="dsec"><h4>Motifs relevés dans la presse</h4><ul>${e.manif.motifs.map(x=>`<li>${escH(x)}</li>`).join("")}</ul></div>`:""}
       ${e.manif.rdv||e.manif.foule?`<div class="dsec"><h4>Infos</h4>${e.manif.rdv?`Rendez-vous ${escH(e.manif.rdv)}`:""}${e.manif.rdv&&e.manif.foule?" · ":""}${e.manif.foule?escH(e.manif.foule):""}</div>`:""}
-      <div class="dsec"><h4>Sources</h4></div>`:""}
+      <div class="dsec"><h4>Sources</h4></div>`:(e.versions?`<div class="dsec"><h4>Sources</h4></div>`:"")}
     <ol>${e.articles.map(a=>`<li><a href="${escH(safeUrl(a.url))}" target="_blank" rel="noopener">${escH(a.t)}</a><small>${escH(a.src)} · ${ago(a.date)}</small></li>`).join("")}</ol>
     ${e.witness?.length?`<div class="dsec"><h4>Sur Bluesky · ${e.witness.length} post${e.witness.length>1?"s":""} en parle${e.witness.length>1?"nt":""}</h4><ul>${[...e.witness].sort((a,b)=>b.date-a.date).slice(0,8).map(w=>`<li><a href="${escH(safeUrl(w.url))}" target="_blank" rel="noopener">Voir le post</a> <span style="color:var(--muted)">${ago(w.date)}</span></li>`).join("")}</ul><p style="color:var(--muted);font-size:12px;margin:4px 0 0">Témoignages non vérifiés, rattachés automatiquement par lieu et sujet.</p></div>`:""}`;
-  d.classList.add("on");d.querySelector(".close").onclick=()=>closeDetail(true);
+  d.classList.add("on");d.classList.toggle("wide",!!e.versions);d.querySelector(".close").onclick=()=>closeDetail(true);
   render();
   if(e.manif?.route?.length>1) map.flyToBounds(L.latLngBounds(e.manif.route),{padding:[60,60],maxZoom:16,duration:.7});
   else if(hasPos(e)) map.flyTo(ll(e),Math.max(map.getZoom(),e.area?8:(e.precise?15:12)),{duration:.7});
