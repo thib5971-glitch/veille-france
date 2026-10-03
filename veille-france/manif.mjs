@@ -128,7 +128,7 @@ export function findOrgs(text) {
 
 /* ---------- Texte des articles ---------- */
 async function articleText(url) {
-  if (!/^https?:\/\//.test(url) || /news\.google\./.test(url)) return "";
+  if (!/^https?:\/\//.test(url) || /news\.google\.|bsky\.app/.test(url)) return "";
   try {
     const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; VeilleFrance/1.0)", "Accept-Language": "fr-FR,fr" }, signal: AbortSignal.timeout(12000), redirect: "follow" });
     if (!r.ok) return "";

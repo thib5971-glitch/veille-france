@@ -58,5 +58,19 @@
       "name": "Le Parisien · faits divers",
       "url": "https://feeds.leparisien.fr/leparisien/rss/faits-divers"
     }
-  ]
+  ],
+  "bluesky": {
+    "enabled": true,
+    "queries": [
+      "manifestation",
+      "manif",
+      "rassemblement",
+      "cortège",
+      "intervention en cours",
+      "fusillade",
+      "blocage",
+      "émeutes"
+    ],
+    "trustedDomains": []
+  }
 }
