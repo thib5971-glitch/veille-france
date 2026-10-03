@@ -248,6 +248,9 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
 .org.parti{color:#E2E8F0;border-color:rgba(226,232,240,.4);background:rgba(226,232,240,.06)}
 .org.collectif{color:#5EEAD4;border-color:rgba(94,234,212,.45);background:rgba(94,234,212,.08)}
 .org em{font-style:normal;font-weight:500;opacity:.8;margin-left:5px;font-family:var(--body);font-size:11px;letter-spacing:0}
+.orient{font:800 12px var(--cond);letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:4px;border:1px solid var(--line2);color:var(--ink);background:var(--bg2)}
+.orient.g{border-color:#E8505B;color:#FFB3B8}.orient.c{border-color:#F2C14E;color:#FFE3A3}.orient.d{border-color:#4D8DFF;color:#B3CCFF}
+.orient.mix{border-color:#9B5CFF;color:#D9C2FF}.orient.syn{border-color:#FBBF24;color:#FDE68A}.orient.none{color:var(--muted)}
 .org.none{color:var(--muted);border-color:var(--line2)}
 .mroute{font-size:13px}
 .mroute b{color:#C4A5FF;font-weight:600}
@@ -381,7 +384,7 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
   </div>
 </section>
 
-<footer>Un robot relit les flux RSS des journaux et les posts Bluesky toutes les 5 à 10 minutes, reconnaît la commune parmi les 35 000 de France, classe la gravité, repère les manifestations et interventions signalées comme en cours, et regroupe les articles qui parlent du même fait. « En cours » veut dire signalé par la presse il y a moins de 2 à 4 heures : il n'existe pas de flux officiel en temps réel des interventions, donc un événement peut être déjà terminé. Tout est détecté à partir des mots du titre, l'article fait foi. Fond de carte © les contributeurs OpenStreetMap.</footer>
+<footer>Un robot relit les flux RSS des journaux et les posts Bluesky toutes les 5 à 10 minutes, reconnaît la commune parmi les 35 000 de France, classe la gravité, repère les manifestations et interventions signalées comme en cours, et regroupe les articles qui parlent du même fait. « En cours » veut dire signalé par la presse il y a moins d'1 h 15 pour une intervention (et terminé dès qu'un article annonce la fin) et 3 à 4 heures pour une manifestation : il n'existe pas de flux officiel en temps réel des interventions, donc un événement peut être déjà terminé. Tout est détecté à partir des mots du titre, l'article fait foi. Fond de carte © les contributeurs OpenStreetMap.</footer>
 
 <dialog id="settings">
   <h3>Réglages des alertes</h3>
@@ -419,7 +422,7 @@ let alertCfg=Object.assign({on:false,sev:"crit",deps:[],sound:true,live:"0"},ls.
 let cursor=null, playing=null, speed=1, dropIds=new Set();
 const now=()=>cursor??Date.now();
 const isViol=e=>!!SEV[e.sev];
-const isLive=(e,T=now())=>{if(!e.kind||!KIND[e.kind])return false;const last=e.updated||e.date;const w=(e.ongoing?4:KIND[e.kind].win)*3600e3;return last<=T&&T-last<=w;};
+const isLive=(e,T=now())=>{if(!e.kind||!KIND[e.kind]||e.ended)return false;const last=e.updated||e.date;const w=e.kind==="intervention"?75*60e3:(e.ongoing?4:KIND[e.kind].win)*3600e3;return last<=T&&T-last<=w;};
 
 /* ---------- Carte détaillée ---------- */
 const FR_BOUNDS=[[41.3,-5.3],[51.15,9.65]];
@@ -469,6 +472,28 @@ function drawMarkers(vis){
     m.on("click",()=>select(e.id));m.addTo(mkGroup);
   });
 }
+/* ---------- Orientation politique estimée ----------
+   Seulement à partir des organisateurs dont la position est documentée : partis (classement usuel de la presse)
+   et quelques collectifs classés de façon constante par les médias. Les syndicats sont non partisans par statut. */
+const ORIENT={"LFI":["Gauche radicale",-2.5],"NPA":["Extrême gauche",-3],"LO":["Extrême gauche",-3],"PCF":["Gauche",-2],"PS":["Gauche",-1.5],"Les Écologistes":["Gauche écologiste",-1.8],"Place publique":["Gauche",-1.3],
+  "Attac":["Gauche altermondialiste",-2],"Soulèvements de la Terre":["Écologie radicale",-2.5],
+  "Renaissance":["Centre",0],"MoDem":["Centre",0],"Horizons":["Centre droit",.7],"LR":["Droite",2],"DLF":["Droite souverainiste",2.4],
+  "RN":["Extrême droite",3],"Reconquête":["Extrême droite",3],"Action française":["Extrême droite",3],"Némésis":["Extrême droite",3],"Manif pour tous":["Droite conservatrice",2],
+  "Les Patriotes":["Souverainiste",2.5],"UPR":["Souverainiste",1.5]};
+const TRANS=new Set(["Gilets jaunes"]);
+function orientation(orgs){
+  orgs=orgs||[];
+  if(!orgs.length) return{label:"Non déterminée",why:"organisateurs non identifiés dans les articles",cls:"none"};
+  const pos=orgs.filter(o=>ORIENT[o.sigle]);
+  if(orgs.some(o=>TRANS.has(o.sigle))&&!pos.length) return{label:"Transpartisane",why:"mouvement qui se revendique hors partis (Gilets jaunes)",cls:"mix"};
+  if(!pos.length){const syn=orgs.every(o=>o.type==="syndicat");
+    return{label:syn?"Syndicale":"Non déterminée",why:syn?"appel de syndicats, non partisans par statut":"organisateurs sans positionnement politique établi ("+orgs.map(o=>o.sigle).join(", ")+")",cls:syn?"syn":"none"};}
+  const v=pos.map(o=>ORIENT[o.sigle][1]),mn=Math.min(...v),mx=Math.max(...v),m=v.reduce((a,b)=>a+b,0)/v.length;
+  if(mx-mn>=3) return{label:"Transpartisane",why:"appel commun de "+pos.map(o=>o.sigle).join(", "),cls:"mix"};
+  const label=m<=-2.6?"Extrême gauche":m<=-1.4?"Gauche":m<-.5?"Centre gauche":m<=.5?"Centre":m<1.5?"Centre droit":m<2.6?"Droite":"Extrême droite";
+  return{label,why:"d'après "+pos.map(o=>`${o.sigle} (${ORIENT[o.sigle][0]})`).join(", ")+(orgs.length>pos.length?", avec "+orgs.filter(o=>!ORIENT[o.sigle]).map(o=>o.sigle).join(", "):""),cls:m<-.5?"g":m<=.5?"c":"d"};
+}
+const orientChip=orgs=>{const o=orientation(orgs);return`<span class="orient ${o.cls}" title="${escH(o.why)}">${escH(o.label)}</span>`;};
 const orgTxt=e=>(e.manif?.orgs||[]).slice(0,3).map(o=>o.sigle).join(", ");
 function orgBadges(e,full){const o=e.manif?.orgs||[];if(!o.length)return`<span class="org none">Organisateurs non identifiés</span>`;
   return o.map(x=>`<span class="org ${x.type}" title="${escH(x.nom)}${x.famille?" · "+escH(x.famille)+" (classement usuel de la presse)":""}">${escH(x.sigle)}${x.famille&&full!==false?`<em>${escH(x.famille)}</em>`:""}</span>`).join("");}
@@ -608,7 +633,7 @@ function buildLiveUI(live){
 function planCard(p,live){
   const w=whenLbl(p);
   return`<button class="mcard plan${selected===p.id?" sel":""}" data-id="${p.id}"><div class="city">${escH(p.place||"National / lieu à préciser")}<small>${live?"en cours selon l'agenda":(p.dep&&depByCode[p.dep]?escH(depByCode[p.dep].nom):"")}</small></div>
-    ${live?"":`<div class="when">${escH(w.time)}</div>`}<div class="orgs">${p.orgs?.length?p.orgs.map(o=>`<span class="org ${o.type}" title="${escH(o.nom)}">${escH(o.sigle)}${o.famille?`<em>${escH(o.famille)}</em>`:""}</span>`).join(""):`<span class="org none">Organisateurs non identifiés</span>`}</div>
+    ${live?"":`<div class="when">${escH(w.time)}</div>`}<div class="orgs">${orientChip(p.orgs)}${p.orgs?.length?p.orgs.map(o=>`<span class="org ${o.type}" title="${escH(o.nom)}">${escH(o.sigle)}${o.famille?`<em>${escH(o.famille)}</em>`:""}</span>`).join(""):`<span class="org none">Organisateurs non identifiés</span>`}</div>
     <div class="mt">${escH(p.title)}</div>${p.where?`<div class="mroute"><b>Lieu</b> ${escH(p.where)}</div>`:""}
     <div class="mfoot"><span>${p.origin==="agenda"?"agenda militant":"annonce presse"}</span><span>${p.sources.length} source${p.sources.length>1?"s":""}</span></div></button>`;
 }
@@ -630,7 +655,7 @@ function buildManifPanel(ms,liveP=[],nextP=[]){
   g.innerHTML=liveP.map(p=>planCard(p,true)).join("")+ms.map(e=>{const m=e.manif||{};
     const route=m.from||m.to?`<div class="mroute">${m.from?`<b>Départ</b> ${escH(m.from.label)}`:""}${m.from&&m.to?" → ":""}${m.to?`<b>Arrivée</b> ${escH(m.to.label)}`:""}</div>`:"";
     return`<button class="mcard${selected===e.id?" sel":""}" data-id="${e.id}"><div class="city">${escH(e.place||"Lieu inconnu")}<small>${m.rdv?"rdv "+m.rdv+" · ":""}signalée ${ago(e.updated||e.date)}</small></div>
-      <div class="orgs">${orgBadges(e)}</div><div class="mt">${escH(e.title)}</div>${route}
+      <div class="orgs">${orientChip(e.manif?.orgs)}${orgBadges(e,false)}</div><div class="mt">${escH(e.title)}</div>${route}
       ${m.motifs?.length?`<div class="mmotif">${escH(m.motifs.slice(0,2).join(" · "))}</div>`:""}
       <div class="mfoot">${m.foule?`<span>${escH(m.foule)}</span>`:""}<span>${e.articles.length} source${e.articles.length>1?"s":""}</span>${e.witness?.length?`<span style="color:#7DB8FF">${e.witness.length} témoignage${e.witness.length>1?"s":""} Bluesky</span>`:""}${m.route?"<span>parcours tracé</span>":""}</div></button>`;}).join("");
   g.querySelectorAll(".mcard").forEach(b=>b.onclick=()=>{select(b.dataset.id);document.getElementById("lmap").scrollIntoView({behavior:"smooth",block:"center"});});
@@ -685,6 +710,7 @@ function selectPlanned(p){
     <h3>${escH(p.title)}</h3>
     <div class="row"><span>${escH(w.day)} · ${escH(w.time)}</span><span>${escH(p.place||"lieu à préciser")}${p.dep?" ("+escH(p.dep)+")":""}</span></div>
     ${p.where?`<div class="dsec"><h4>Lieu de rendez-vous</h4>${escH(p.where)}</div>`:""}
+    <div class="dsec"><h4>Orientation estimée</h4><div class="orgs">${orientChip(p.orgs)}</div><div style="color:var(--muted);font-size:12px;margin-top:4px">${escH(orientation(p.orgs).why)}</div></div>
     <div class="dsec"><h4>Organisateurs cités</h4><div class="orgs">${p.orgs?.length?p.orgs.map(o=>`<span class="org ${o.type}" title="${escH(o.nom)}">${escH(o.sigle)}${o.famille?`<em>${escH(o.famille)}</em>`:""}</span>`).join(""):`<span class="org none">non identifiés</span>`}</div></div>
     <div class="dsec"><h4>Sources</h4></div>
     <ol>${p.sources.map(s=>`<li><a href="${escH(safeUrl(s.url))}" target="_blank" rel="noopener">${escH(s.src)}</a></li>`).join("")}</ol>
@@ -705,7 +731,8 @@ function select(id){
     <div class="row"><span>${escH(placeLbl(e))}${e.dep&&depByCode[e.dep]&&!e.area?" · "+escH(depByCode[e.dep].nom):""}${e.area?" · ville non précisée":""}</span><span>${e.articles.length} article${e.articles.length>1?"s":""}</span></div>
     ${isLive(e)?`<div class="row" style="margin-top:6px;color:#C4A5FF">Dernier signalement ${ago(e.updated||e.date)}, peut être déjà terminé</div>`:""}
     ${versionsHTML(e)}
-    ${e.manif?`<div class="dsec"><h4>Organisateurs cités</h4><div class="orgs">${orgBadges(e)}</div></div>
+    ${e.manif?`<div class="dsec"><h4>Orientation estimée</h4><div class="orgs">${orientChip(e.manif.orgs)}</div><div style="color:var(--muted);font-size:12px;margin-top:4px">${escH(orientation(e.manif.orgs).why)}</div></div>
+      <div class="dsec"><h4>Organisateurs cités</h4><div class="orgs">${orgBadges(e)}</div></div>
       ${e.manif.from||e.manif.to?`<div class="dsec"><h4>Parcours</h4>${e.manif.from?`Départ : ${escH(e.manif.from.label)}<br>`:""}${e.manif.to?`Arrivée : ${escH(e.manif.to.label)}`:""}${e.manif.route?"":`<br><span style="color:var(--muted)">tracé non disponible</span>`}</div>`:""}
       ${e.manif.motifs?.length?`<div class="dsec"><h4>Motifs relevés dans la presse</h4><ul>${e.manif.motifs.map(x=>`<li>${escH(x)}</li>`).join("")}</ul></div>`:""}
       ${e.manif.rdv||e.manif.foule?`<div class="dsec"><h4>Infos</h4>${e.manif.rdv?`Rendez-vous ${escH(e.manif.rdv)}`:""}${e.manif.rdv&&e.manif.foule?" · ":""}${e.manif.foule?escH(e.manif.foule):""}</div>`:""}
