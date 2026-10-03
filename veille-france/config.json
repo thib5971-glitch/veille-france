@@ -19,6 +19,10 @@
       "url": "https://news.google.com/rss/search?q=%22intervention%20en%20cours%22%20OR%20RAID%20OR%20GIGN%20OR%20%22p%C3%A9rim%C3%A8tre%20de%20s%C3%A9curit%C3%A9%22%20OR%20%C3%A9vacuation%20OR%20%22prise%20d%27otage%22%20OR%20retranch%C3%A9%20when%3A12h&hl=fr&gl=FR&ceid=FR:fr"
     },
     {
+      "name": "Google Actu · manifs annoncées",
+      "url": "https://news.google.com/rss/search?q=%22appel%20%C3%A0%20manifester%22%20OR%20%22manifestation%20pr%C3%A9vue%22%20OR%20%22journ%C3%A9e%20de%20mobilisation%22%20OR%20%22appellent%20%C3%A0%20manifester%22%20OR%20%22rassemblement%20pr%C3%A9vu%22%20when%3A3d&hl=fr&gl=FR&ceid=FR:fr"
+    },
+    {
       "name": "Google Actu · violences",
       "url": "https://news.google.com/rss/search?q=fusillade%20OR%20poignard%C3%A9%20OR%20%22coups%20de%20couteau%22%20OR%20%22tu%C3%A9%20par%20balle%22%20OR%20rixe%20OR%20agression%20when%3A2d&hl=fr&gl=FR&ceid=FR:fr"
     },
@@ -72,5 +76,8 @@
       "émeutes"
     ],
     "trustedDomains": []
+  },
+  "agendas": {
+    "enabled": true
   }
 }
