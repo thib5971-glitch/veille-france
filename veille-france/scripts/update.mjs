@@ -94,6 +94,9 @@ function locate(text) {
       if (s === 0 && /^\s*[:,–-]/.test(after)) ctx += 2;
       if (/^\s*\((\d{2,3}|2A|2B)\)/.test(after)) ctx += 3;
       let cand = null;
+      // « Laurence de Charette », « Jean d'Ormesson » : un nom de famille, pas une ville
+      const before = s >= 2 ? toks[s - 2].raw : "", surname = (prev === "de" || prev === "d") && /^\p{Lu}[\p{Ll}-]+$/u.test(before) && !/^(Saint|Sainte|Ville|Pays|Communaute|Region|Departement|Prefecture|Mairie|Place|Rue|Gare|Port|Pont|Porte|Ile|Val|Mont|Bois|Fort|Centre|Quartier|Lycee|College|Universite|Tribunal|Hopital|CHU|Maison|Eglise|Cathedrale|Commune|Metropole|Agglomeration|Bassin|Golfe|Baie|Cote|Plaine|Vallee|Marais)$/u.test(norm(before));
+      if (surname && !(CITY.has(k) && pickHomonym(CITY.get(k)).pop >= 20000)) continue;
       if (CITY.has(k)) {
         const c = pickHomonym(CITY.get(k));
         const single = len === 1;
@@ -116,7 +119,7 @@ function locate(text) {
 const R_CRIT = /\b(tue|tuee|tues|tuees|mort|morte|morts|mortes|meurtre\w*|homicide\w*|assassin\w*|abattu\w*|decede\w*|deces|cadavre|corps sans vie|attentat\w*|feminicide\w*|infanticide|perd la vie|ont perdu la vie|sans vie)\b/;
 const R_GRAVE = /\b(blesse\w*|poignard\w*|coups? de couteau|couteau|fusillade\w*|tirs?|par balles?|balles?|griev\w*|viol|violee|violees|enlev\w*|sequestr\w*|incendie criminel|arme a feu|kalachnikov|pronostic vital|machette|arme blanche|lynch\w*|passage a tabac|tabasse\w*|urgence absolue|jets? de (pierres?|projectiles?|cocktails?)|perd(u)? (un|son) oeil|eborgne\w*)\b/;
 const R_ELEVE = /\b(agress\w*|violences?|violent\w*|emeute\w*|rixe\w*|braquage\w*|braque\w*|affrontement\w*|interpell\w*|garde a vue|casseur\w*|mortier\w*|degradation\w*|vol a main armee|menace\w*|incendi\w*|refus d.obtemperer|narcotrafic\w*|trafic de drogue|reglement de comptes?|frappe\w*|cambriol\w*|home-jacking|car-jacking|guet-apens|caillasse\w*)\b/;
-const NOISE = /\b(football|ligue 1|match|rugby|tennis|film|serie|cinema|bande-annonce|critique|livre|roman|horoscope|meteo|recette|bourse|cac 40|jeu video|playstation|netflix|podcast|exposition|concert|festival|anniversaire de la mort|il y a \d+ ans|proces de|condamne a|jugement|cour d'assises|en appel|requisitions?|saison \d|cortege nuptial|mariage|nuptial|vehicules (americains|anciens|de collection)|voitures (anciennes|de collection)|retro|concentration de motos|salon de|brocante|messi|equipe de france|selection nationale|mondial|coupe du monde|ligue des champions|escape game|murder party|enquete immersive|jeu de piste|nosocomiales?|infections?|epidemie|maladie|grippe|covid|canicule|intoxication alimentaire|requis\w*|perpetuite|verdict|condamne\w*|assises|tribunal|mis en examen|juge\w* pour)\b/;
+const NOISE = /\b(football|ligue 1|match|rugby|tennis|film|serie|cinema|bande-annonce|critique|livre|roman|horoscope|meteo|recette|bourse|cac 40|jeu video|playstation|netflix|podcast|exposition|concert|festival|anniversaire de la mort|il y a \d+ ans|proces de|condamne a|jugement|cour d'assises|en appel|requisitions?|saison \d|editorial|edito|tribune|chronique|billet d.humeur|point de vue|cortege nuptial|mariage|nuptial|vehicules (americains|anciens|de collection)|voitures (anciennes|de collection)|retro|concentration de motos|salon de|brocante|messi|equipe de france|selection nationale|mondial|coupe du monde|ligue des champions|escape game|murder party|enquete immersive|jeu de piste|nosocomiales?|infections?|epidemie|maladie|grippe|covid|canicule|intoxication alimentaire|requis\w*|perpetuite|verdict|condamne\w*|assises|tribunal|mis en examen|juge\w* pour)\b/;
 const FOREIGN = /\b(argentin\w*|chili\w*|perou|canada|quebec|australie|japon|coree|etats-unis|americain\w*|ukraine|ukrainien\w*|russie|russe\w*|gaza|israel\w*|liban\w*|iran\w*|syrie\w*|soudan|mexique|bresil|inde|chine|chinois|espagne|espagnol\w*|italie|italien\w*|allemagne|allemand\w*|belgique|belge\w*|suisse|royaume-uni|britannique\w*|londres|new york|texas|californie|afrique|algerie|maroc|tunisie|turquie|pakistan|afghanistan|venezuela|colombie|haiti|nigeria|congo|yemen|irak|cisjordanie)\b/;
 const TYPES = [
   ["Terrorisme", /attentat|terroris/], ["Violences conjugales", /conjoint|compagne|compagnon|feminicide|ex-mari|ex-femme|epouse|violences conjugales/],
@@ -318,9 +321,13 @@ const A = cfg.alerts || {};
 const topic = process.env.NTFY_TOPIC;
 const sevOK = s => SEVW[s] >= SEVW[A.minSeverity || "crit"];
 const depOK = d => !A.departements?.length || A.departements.includes(d);
+// zone autour d'un point : "zone": { "lat": 48.85, "lon": 2.35, "km": 20 }
+const zoneOK = e => { const z = A.zone; if (!z || z.lat == null) return true; if (e.lat == null) return false;
+  const r = Math.PI / 180, x = Math.sin((e.lat - z.lat) * r / 2) ** 2 + Math.cos(z.lat * r) * Math.cos(e.lat * r) * Math.sin((e.lon - z.lon) * r / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(x)) <= (z.km || 20); };
 let sent = 0;
 for (const e of events) {
-  if (e.alerted || !(sevOK(e.sev) || (A.live && e.kind)) || !depOK(e.dep)) continue;
+  if (e.alerted || !(sevOK(e.sev) || (A.live && e.kind)) || !depOK(e.dep) || !zoneOK(e)) continue;
   if (firstRun || !topic || NOW - e.date > 6 * 3600e3) { e.alerted = true; continue; }
   if (sent >= (A.maxPerRun || 8)) break;
   try {
