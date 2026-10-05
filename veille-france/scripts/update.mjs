@@ -325,26 +325,37 @@ const depOK = d => !A.departements?.length || A.departements.includes(d);
 const zoneOK = e => { const z = A.zone; if (!z || z.lat == null) return true; if (e.lat == null) return false;
   const r = Math.PI / 180, x = Math.sin((e.lat - z.lat) * r / 2) ** 2 + Math.cos(z.lat * r) * Math.cos(e.lat * r) * Math.sin((e.lon - z.lon) * r / 2) ** 2;
   return 2 * 6371 * Math.asin(Math.sqrt(x)) <= (z.km || 20); };
+// Deux canaux : le sujet privé (secret NTFY_TOPIC, filtré par departements / zone)
+// et des sujets publics par département (préfixe depTopicPrefix) auxquels n'importe qui peut s'abonner depuis la carte.
+const SERVER = process.env.NTFY_SERVER || A.server || "https://ntfy.sh";
+const PREFIX = A.depTopicPrefix || null;
+const depSevOK = s => SEVW[s] >= SEVW[A.depMinSeverity || "grave"];
+async function push(t, e) {
+  const where = e.place ? `${e.place}${e.dep && !e.area ? " (" + e.dep + ")" : ""}` : "Lieu non détecté";
+  await fetch(`${SERVER}/${encodeURIComponent(t)}`, {
+    method: "POST", body: `${where} · ${e.type}\n${e.articles[0].src}`,
+    headers: { "Title": "=?UTF-8?B?" + Buffer.from(((e.kind && SEVW[e.sev] < 2) ? "EN COURS · " : "") + e.title.slice(0, 170)).toString("base64") + "?=", "Priority": e.sev === "crit" ? "5" : "4",
+      "Tags": e.sev === "crit" ? "rotating_light" : "warning", "Click": e.articles[0].url, ...(A.pageUrl ? { "Actions": `view, Ouvrir la carte, ${A.pageUrl}` } : {}) },
+    signal: AbortSignal.timeout(10000)
+  });
+}
 let sent = 0;
 for (const e of events) {
-  if (e.alerted || !(sevOK(e.sev) || (A.live && e.kind)) || !depOK(e.dep) || !zoneOK(e)) continue;
-  if (firstRun || !topic || NOW - e.date > 6 * 3600e3) { e.alerted = true; continue; }
-  if (sent >= (A.maxPerRun || 8)) break;
+  if (e.alerted) continue;
+  const toMain = !!topic && (sevOK(e.sev) || (A.live && e.kind)) && depOK(e.dep) && zoneOK(e);
+  const toDep = !!PREFIX && !!e.dep && (depSevOK(e.sev) || (e.kind === "intervention"));
+  if (firstRun || NOW - e.date > 6 * 3600e3 || (!toMain && !toDep)) { e.alerted = true; continue; }
+  if (sent >= (A.maxPerRun || 12)) break;
   try {
-    const where = e.place ? `${e.place}${e.dep && !e.area ? " (" + e.dep + ")" : ""}` : "Lieu non détecté";
-    await fetch(`${process.env.NTFY_SERVER || A.server || "https://ntfy.sh"}/${encodeURIComponent(topic)}`, {
-      method: "POST", body: `${where} · ${e.type}\n${e.articles[0].src}`,
-      headers: { "Title": "=?UTF-8?B?" + Buffer.from(((e.kind && SEVW[e.sev] < 2) ? "EN COURS · " : "") + e.title.slice(0, 170)).toString("base64") + "?=", "Priority": e.sev === "crit" ? "5" : "4",
-        "Tags": e.sev === "crit" ? "rotating_light" : "warning", "Click": e.articles[0].url, ...(A.pageUrl ? { "Actions": `view, Ouvrir la carte, ${A.pageUrl}` } : {}) },
-      signal: AbortSignal.timeout(10000)
-    });
+    if (toMain) await push(topic, e);
+    if (toDep) await push(`${PREFIX}-${e.dep}`, e);
     e.alerted = true; sent++;
   } catch (err) { log("ntfy :", err.message); }
 }
 
 await fs.mkdir(P("data/"), { recursive: true });
 if (agendaStatus) feedStatus.push({ name: "Agendas Démosphère", ok: agendaStatus.ok > 0, n: agendaStatus.ok, kept: planned.filter(p => p.origin === "agenda").length });
-const out = { updated: new Date(NOW).toISOString(), feeds: feedStatus, events, planned, plannedFetched, agendaStatus };
+const out = { updated: new Date(NOW).toISOString(), feeds: feedStatus, events, planned, plannedFetched, agendaStatus, ntfy: PREFIX ? { server: SERVER, prefix: PREFIX } : null };
 await fs.writeFile(P("data/data.json"), JSON.stringify(out));
 log(`OK · ${feedStatus.filter(f => f.ok).length}/${SOURCES.length} sources · ${witnesses} témoignages Bluesky · ${newIds.size} nouveaux faits · ${escalated.size} aggravés · ${events.length} au total · ${sent} alertes`);
 feedStatus.filter(f => !f.ok).forEach(f => log("  ✗", f.name, f.error));
