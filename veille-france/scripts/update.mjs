@@ -114,10 +114,10 @@ function locate(text) {
 
 /* ---------- Gravité et type ---------- */
 const R_CRIT = /\b(tue|tuee|tues|tuees|mort|morte|morts|mortes|meurtre\w*|homicide\w*|assassin\w*|abattu\w*|decede\w*|deces|cadavre|corps sans vie|attentat\w*|feminicide\w*|infanticide|perd la vie|ont perdu la vie|sans vie)\b/;
-const R_GRAVE = /\b(blesse\w*|poignard\w*|coups? de couteau|couteau|fusillade\w*|tirs?|par balles?|balles?|griev\w*|viol|violee|violees|enlev\w*|sequestr\w*|incendie criminel|arme a feu|kalachnikov|pronostic vital|machette|arme blanche|lynch\w*|passage a tabac|tabasse\w*|urgence absolue)\b/;
+const R_GRAVE = /\b(blesse\w*|poignard\w*|coups? de couteau|couteau|fusillade\w*|tirs?|par balles?|balles?|griev\w*|viol|violee|violees|enlev\w*|sequestr\w*|incendie criminel|arme a feu|kalachnikov|pronostic vital|machette|arme blanche|lynch\w*|passage a tabac|tabasse\w*|urgence absolue|jets? de (pierres?|projectiles?|cocktails?)|perd(u)? (un|son) oeil|eborgne\w*)\b/;
 const R_ELEVE = /\b(agress\w*|violences?|violent\w*|emeute\w*|rixe\w*|braquage\w*|braque\w*|affrontement\w*|interpell\w*|garde a vue|casseur\w*|mortier\w*|degradation\w*|vol a main armee|menace\w*|incendi\w*|refus d.obtemperer|narcotrafic\w*|trafic de drogue|reglement de comptes?|frappe\w*|cambriol\w*|home-jacking|car-jacking|guet-apens|caillasse\w*)\b/;
-const NOISE = /\b(football|ligue 1|match|rugby|tennis|film|serie|cinema|bande-annonce|critique|livre|roman|horoscope|meteo|recette|bourse|cac 40|jeu video|playstation|netflix|podcast|exposition|concert|festival|anniversaire de la mort|il y a \d+ ans|proces de|condamne a|jugement|cour d'assises|en appel|requisitions?|requis\w*|perpetuite|verdict|condamne\w*|assises|tribunal|mis en examen|juge\w* pour)\b/;
-const FOREIGN = /\b(etats-unis|americain\w*|ukraine|ukrainien\w*|russie|russe\w*|gaza|israel\w*|liban\w*|iran\w*|syrie\w*|soudan|mexique|bresil|inde|chine|chinois|espagne|espagnol\w*|italie|italien\w*|allemagne|allemand\w*|belgique|belge\w*|suisse|royaume-uni|britannique\w*|londres|new york|texas|californie|afrique|algerie|maroc|tunisie|turquie|pakistan|afghanistan|venezuela|colombie|haiti|nigeria|congo|yemen|irak|cisjordanie)\b/;
+const NOISE = /\b(football|ligue 1|match|rugby|tennis|film|serie|cinema|bande-annonce|critique|livre|roman|horoscope|meteo|recette|bourse|cac 40|jeu video|playstation|netflix|podcast|exposition|concert|festival|anniversaire de la mort|il y a \d+ ans|proces de|condamne a|jugement|cour d'assises|en appel|requisitions?|saison \d|cortege nuptial|mariage|nuptial|vehicules (americains|anciens|de collection)|voitures (anciennes|de collection)|retro|concentration de motos|salon de|brocante|messi|equipe de france|selection nationale|mondial|coupe du monde|ligue des champions|escape game|murder party|enquete immersive|jeu de piste|nosocomiales?|infections?|epidemie|maladie|grippe|covid|canicule|intoxication alimentaire|requis\w*|perpetuite|verdict|condamne\w*|assises|tribunal|mis en examen|juge\w* pour)\b/;
+const FOREIGN = /\b(argentin\w*|chili\w*|perou|canada|quebec|australie|japon|coree|etats-unis|americain\w*|ukraine|ukrainien\w*|russie|russe\w*|gaza|israel\w*|liban\w*|iran\w*|syrie\w*|soudan|mexique|bresil|inde|chine|chinois|espagne|espagnol\w*|italie|italien\w*|allemagne|allemand\w*|belgique|belge\w*|suisse|royaume-uni|britannique\w*|londres|new york|texas|californie|afrique|algerie|maroc|tunisie|turquie|pakistan|afghanistan|venezuela|colombie|haiti|nigeria|congo|yemen|irak|cisjordanie)\b/;
 const TYPES = [
   ["Terrorisme", /attentat|terroris/], ["Violences conjugales", /conjoint|compagne|compagnon|feminicide|ex-mari|ex-femme|epouse|violences conjugales/],
   ["Refus d'obtempérer, police", /refus d.obtemperer|policiers? (blesse|agresse|vise|percute)|gendarmes? (blesse|agresse|percute)/], ["Arme à feu", /fusillade|\btirs?\b|\bballes?\b|arme a feu|kalach|abattu/],
@@ -130,6 +130,8 @@ const TYPES = [
 const SEVW = { crit: 3, grave: 2, eleve: 1, info: 0 };
 // Manifestations et interventions en cours
 const R_MANIF = /\b(manifestation\w*|manifestant\w*|manifester|manifesteront|manifestent|appel a la greve|journee de mobilisation|rassemblement\w*|cortege\w*|defile\w*|blocus|blocage\w*|mobilisation\w*|sit-in|marche blanche|piquet de greve|emeute\w*|affrontement\w*|violences urbaines|nuit de violences|occupation d\w*)\b/;
+// Manifestation : il faut un vrai mot de manif dans le titre (pas juste « mobilisation » ou « affrontements »)
+const R_DEMO = /\b(manifs?|manifestation\w*|manifestant\w*|manifester|manifesteront|manifestent|rassemblement\w*|cortege\w*|defile\w*|blocus|blocage\w* (de|des|du|d.)\s?(lycee|universite|fac|route|rocade|peripherique|raffinerie|depot|port|autoroute|axe|ville|pont)\w*|sit-in|marche blanche|marche (pour|contre|de soutien)|piquet de greve|occupation d(u|e la|es) \w+)\b/;
 // Intervention en cours : opération des forces de l'ordre (ou des secours) qui se déroule MAINTENANT
 const R_INTERV = /\b(raid|gign|bri|forcene\w*|retranche\w*|prise d.otages?|otages?|braquage|braqueurs?|chasse a l.homme|traque|perimetre de securite|boucle\w*|evacu\w*|colis suspect|alerte a la bombe|alerte (a l.)?attentat|intervention|operation de (police|gendarmerie)|policiers? (deploye|mobilise|sur place|deployes|mobilises)|forces de l.ordre|crs|helicoptere|individu arme|homme arme|tireur|fusillade|charges?|gaz lacrymogenes?|interpellations? en cours)\b/;
 const R_NOW = /\b(en cours|actuellement|en ce moment|a l.instant|toujours (retranche|en cours|sur place|boucle|recherche|en fuite)|depuis (ce matin|cet apres-midi|ce soir|plusieurs heures|\d+ ?h(eures?)?)|en direct|direct|live|se poursui\w*|intervient|interviennent|est retranche|sont retranches|est boucle|sont deployes|sont mobilises|est en cours|encercl\w*|en fuite|recherche(s|nt)? activement|evacue(s|es)? par precaution|alerte en cours|retranche (chez|dans)|(quartier|rue|secteur|zone|gare|centre-ville|immeuble|lycee|college|ecole|magasin) (est )?(boucle|evacue|confine)\w*|confinement)\b/;
@@ -146,11 +148,13 @@ function isExcluded(t) {
   return false;
 }
 function classify(title, desc) {
+  const strip = x => x.replace(/\b(contre|pour denoncer|denoncer|lutte contre|journee contre|marche contre) (les |la |le |l.)?(violences?|agressions?|feminicides?|racisme|harcelement|viols?|meurtres?)[\w' -]{0,40}/g, " ");
+  title = strip(low(title)); desc = strip(low(desc));
   const t = low(title), all = t + " " + low(desc);
   if (NOISE.test(t)) return null;
   if (isExcluded(t)) return null;
   const now = R_NOW.test(t) && !R_ENDED.test(t);
-  const kind = R_PAST.test(t) ? null : (R_INTERV.test(t) && now) ? "intervention" : R_MANIF.test(t) ? "manif" : null;
+  const kind = R_PAST.test(t) ? null : (R_INTERV.test(t) && now) ? "intervention" : (R_DEMO.test(t) && !R_ENDED.test(t)) ? "manif" : null;
   const ongoing = kind === "intervention" ? true : !!kind && R_ONGOING.test(all) && !R_ENDED.test(t);
   const ended = R_ENDED.test(t);
   let sev = null;
@@ -208,7 +212,9 @@ function parseFeed(xml, feed) {
 /* ---------- Programme principal ---------- */
 const prev = await readJSON(P("data/data.json"), { events: [] });
 const firstRun = !prev.updated || !prev.events.some(e => !e.seed);
-let events = (prev.events || []).filter(e => NOW - e.date <= KEEP_MS).filter(e => e.seed || e.kind || !isExcluded(low(e.title)));
+let events = (prev.events || []).filter(e => NOW - e.date <= KEEP_MS).filter(e => e.seed || e.kind || !isExcluded(low(e.title)))
+  .filter(e => { if (e.kind === "manif" && !e.seed && (!R_DEMO.test(low(e.title)) || R_ENDED.test(low(e.title)))) { delete e.kind; delete e.ongoing; return e.sev !== "info"; } return true; })
+  .filter(e => e.seed || !NOISE.test(low(e.title)));
 const seenLinks = new Set(events.flatMap(e => e.articles.map(a => a.url)));
 const seenTitles = new Set(events.flatMap(e => e.articles.map(a => key(a.t))));
 const feedStatus = [];
