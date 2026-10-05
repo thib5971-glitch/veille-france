@@ -150,6 +150,23 @@ function isExcluded(t) {
   if (/\b(chien|chat|cheval|animal|animaux|vache|mouton|betail)s?\b/.test(t) && !/\b(homme|femme|enfant|adolescent|personne|habitant|victime|policier|gendarme)\w*\b/.test(t)) return true;
   return false;
 }
+/* ---------- Faits anciens racontés aujourd'hui ----------
+   On ne garde que ce qui vient de se produire : un article sur une affaire d'il y a des semaines ou des années est écarté. */
+const R_RETRO = /\b(il y a (\d+|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|plusieurs|quelques) (ans?|annees?|mois|semaines?)|(\d+|un|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|vingt|trente)( ans| mois| semaines?| annees?)( et demi)? (apres|plus tard|jour pour jour)|ans apres|mois apres|anniversaire|commemor\w*|hommage|en memoire|souvenir|impuni\w*|toujours pas (elucide|resolu|retrouve)|non elucide|cold case|affaire classee|reconstitution|proces|verdict|jugement|juge\w*|assises|tribunal|condamn\w*|requis\w*|plaidoirie|appel de la decision|retour sur|que s.est-il passe|ce que l.on sait \d+|la semaine derniere|le mois dernier|l.an dernier|l.annee derniere|l.ete dernier|l.hiver dernier|depuis des (mois|annees)|des annees apres|documentaire|livre|serie|podcast|temoignage|temoigne|raconte)\b/;
+const MOISN = { janvier: 0, fevrier: 1, mars: 2, avril: 3, mai: 4, juin: 5, juillet: 6, aout: 7, septembre: 8, octobre: 9, novembre: 10, decembre: 11 };
+function incidentTooOld(text, pub) {
+  const t = low(text);
+  if (R_RETRO.test(t)) return true;
+  const py = new Date(pub).getUTCFullYear();
+  const yr = t.match(/\b(?:en|de|depuis|du) (19\d\d|20\d\d)\b/); if (yr && +yr[1] < py) return true;
+  for (const m of t.matchAll(/\b(\d{1,2})(?:er)? (janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)(?: (20\d\d))?\b/g)) {
+    let y = m[3] ? +m[3] : py; let d = Date.UTC(y, MOISN[m[2]], +m[1]);
+    if (!m[3] && d > pub + 864e5) { if (d - pub < 90 * 864e5) continue; d = Date.UTC(y - 1, MOISN[m[2]], +m[1]); }
+    if (d > pub) continue;
+    if (pub - d > 3 * 864e5 && pub - d < 400 * 864e5 * 50) return true;
+  }
+  return false;
+}
 function classify(title, desc) {
   const strip = x => x.replace(/\b(contre|pour denoncer|denoncer|lutte contre|journee contre|marche contre) (les |la |le |l.)?(violences?|agressions?|feminicides?|racisme|harcelement|viols?|meurtres?)[\w' -]{0,40}/g, " ");
   title = strip(low(title)); desc = strip(low(desc));
@@ -217,7 +234,8 @@ const prev = await readJSON(P("data/data.json"), { events: [] });
 const firstRun = !prev.updated || !prev.events.some(e => !e.seed);
 let events = (prev.events || []).filter(e => NOW - e.date <= KEEP_MS).filter(e => e.seed || e.kind || !isExcluded(low(e.title)))
   .filter(e => { if (e.kind === "manif" && !e.seed && (!R_DEMO.test(low(e.title)) || R_ENDED.test(low(e.title)))) { delete e.kind; delete e.ongoing; return e.sev !== "info"; } return true; })
-  .filter(e => e.seed || !NOISE.test(low(e.title)));
+  .filter(e => e.seed || !NOISE.test(low(e.title)))
+  .filter(e => e.seed || !incidentTooOld(e.title, e.date));
 const seenLinks = new Set(events.flatMap(e => e.articles.map(a => a.url)));
 const seenTitles = new Set(events.flatMap(e => e.articles.map(a => key(a.t))));
 const feedStatus = [];
@@ -256,6 +274,8 @@ results.forEach((r, i) => {
         continue;
       }
     }
+    // un fait doit être récent : article de moins de 36 h et pas une vieille affaire
+    if (NOW - it.date > 36 * 3600e3 || incidentTooOld(it.title + " " + it.desc, it.date)) continue;
     if (!g && !f.keepUnlocated) continue;
     if (it.bsky && !it.trusted) {
       // simple témoignage : rattaché à un fait déjà connu au même endroit, jamais de création
