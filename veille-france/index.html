@@ -420,6 +420,11 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
     <button class="btn on" id="saveSet">Enregistrer</button>
   </div>
 </dialog>
+<dialog id="phoneDlg">
+  <h3>Alertes sur ton téléphone</h3>
+  <div id="phoneBody"></div>
+  <div class="acts"><button class="btn" id="phoneClose">Fermer</button></div>
+</dialog>
 <div id="toast" role="status"></div>
 
 <script>
@@ -476,10 +481,35 @@ function nearBar(n){
   const bar=document.getElementById("nearbar");if(!near){bar.hidden=true;return;}
   bar.hidden=false;
   bar.innerHTML=`<b>📍 ${escH(near.label||"Autour de moi")}</b><span class="km">${[5,20,50,100].map(k=>`<button data-km="${k}" aria-pressed="${near.km===k}">${k} km</button>`).join("")}</span><small>${n} fait${n>1?"s":""} dans la zone sur ${PERIODS[period]}, triés par distance</small><button class="x" id="nearCopy" title="Pour recevoir les alertes sur ton téléphone uniquement dans cette zone">Alertes téléphone</button><button class="x" id="nearOff" style="margin-left:0">Quitter</button>`;
-  document.getElementById("nearCopy").onclick=async()=>{const z=`"zone": { "lat": ${near.lat.toFixed(2)}, "lon": ${near.lon.toFixed(2)}, "km": ${near.km} }`;
-    try{await navigator.clipboard.writeText(z);toast("Copié : colle-le dans « alerts » de config.json (visible publiquement, arrondi à ~1 km)");}catch(_){prompt("Colle ceci dans « alerts » de config.json :",z);}};
+  document.getElementById("nearCopy").onclick=openPhone;
   bar.querySelectorAll("[data-km]").forEach(b=>b.onclick=()=>{near.km=+b.dataset.km;ls.set("vf_near",near);drawNear();render();fitNear();});
   document.getElementById("nearOff").onclick=()=>{near=null;ls.set("vf_near",null);drawNear();render();map.flyToBounds(FR_BOUNDS,{duration:.6});};
+}
+function depsInZone(){
+  if(!near) return [];
+  const out=[];
+  Object.entries(depLayers).forEach(([code,l])=>{
+    const b=l.getBounds(); if(b.contains([near.lat,near.lon])&&l.getLatLngs){ /* centre dans l'emprise */ }
+    let best=Infinity;
+    const walk=a=>Array.isArray(a)?a.forEach(walk):(a&&a.lat!=null&&(best=Math.min(best,distKm(near.lat,near.lon,a.lat,a.lng))));
+    walk(l.getLatLngs());
+    const inside=b.contains([near.lat,near.lon])&&best<60;
+    if(best<=near.km||inside) out.push({code,nom:depByCode[code]?.nom||code,d:inside?0:best});
+  });
+  return out.sort((a,b)=>a.d-b.d).slice(0,6);
+}
+function openPhone(){
+  const dlg=document.getElementById("phoneDlg"),body=document.getElementById("phoneBody"),n=DATA.ntfy;
+  if(!n){body.innerHTML=`<p class="hint">Les alertes par département ne sont pas encore activées : mets à jour <b>config.json</b> (ligne <code>depTopicPrefix</code>) puis attends le prochain passage du robot.</p>`;}
+  else{
+    const deps=depsInZone(), host=n.server.replace(/^https?:\/\//,"");
+    body.innerHTML=`<p class="hint" style="font-size:14px;color:var(--ink)">1. Installe l'appli gratuite <b>ntfy</b> sur ton téléphone (Android ou iPhone).<br>2. Abonne-toi au(x) département(s) de ta zone (${near.km} km autour de ${escH(near.label||"toi")}) :</p>
+      <ul id="srcList" style="max-height:none">${deps.map(d=>{const t=`${n.prefix}-${d.code}`;return`<li style="align-items:center"><span><b>${escH(d.nom)} (${escH(d.code)})</b><br><code style="color:var(--muted)">${escH(t)}</code></span><span style="display:flex;gap:6px"><a class="btn" href="ntfy://${escH(host)}/${escH(t)}">Ouvrir dans ntfy</a><button class="btn" data-t="${escH(t)}">Copier</button></span></li>`;}).join("")||"<li>Aucun département trouvé dans la zone.</li>"}</ul>
+      <p class="hint">Si le bouton « Ouvrir dans ntfy » ne fait rien, copie le nom, ouvre ntfy, appuie sur « + » et colle-le. Tu recevras les morts, blessés graves et interventions en cours de ces départements, en direct.</p>`;
+    body.querySelectorAll("[data-t]").forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(b.dataset.t);toast("Copié : "+b.dataset.t);}catch(_){prompt("Nom à coller dans ntfy :",b.dataset.t);}});
+  }
+  document.getElementById("phoneClose").onclick=()=>dlg.close();
+  dlg.showModal?dlg.showModal():dlg.setAttribute("open","");
 }
 function fitNear(){if(near)map.flyToBounds(L.latLng(near.lat,near.lon).toBounds(near.km*2000),{duration:.6,padding:[20,20]});}
 async function startNear(){

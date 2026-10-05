@@ -6,8 +6,10 @@
     "departements": [],
     "maxPerRun": 8,
     "server": "https://ntfy.sh",
-    "pageUrl": "",
-    "live": false
+    "pageUrl": "https://thib5971-glitch.github.io/veille-france/",
+    "live": false,
+    "depTopicPrefix": "vf-thib5971",
+    "depMinSeverity": "grave"
   },
   "feeds": [
     {
