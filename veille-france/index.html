@@ -231,6 +231,17 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
 #liveList .tag{font:800 11px var(--cond);letter-spacing:.08em;padding:2px 6px;border-radius:3px;color:#fff;height:fit-content;margin-top:1px}
 #liveList small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
 .liveh[hidden]{display:none!important}
+.nearbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;border:1px solid #2E7D5B;background:rgba(61,220,151,.07);border-radius:8px;font-size:13.5px;position:relative;z-index:1}
+.nearbar[hidden]{display:none}
+.nearbar b{font:700 15px var(--cond);letter-spacing:.04em;color:#7FF0BE}
+.nearbar .km{display:flex;gap:4px}
+.nearbar .km button,.nearbar .x{font:600 12.5px var(--body);padding:3px 9px;border-radius:999px;border:1px solid var(--line2);background:var(--bg2);color:var(--ink);cursor:pointer}
+.nearbar .km button[aria-pressed="true"]{border-color:#3DDC97;color:#0B1320;background:#3DDC97}
+.nearbar .x{margin-left:auto}
+.nearbar small{color:var(--muted)}
+.dist{color:#7FF0BE;font-weight:600}
+#nearBtn.on{background:#2E7D5B;border-color:#3DDC97;color:#fff}
+.me{width:16px;height:16px;border-radius:50%;background:#3DDC97;border:3px solid #0B1320;box-shadow:0 0 0 2px #3DDC97,0 0 16px 4px rgba(61,220,151,.6)}
 .lv.small span,.pl.small span{display:none}
 .liveh{font:700 13px var(--cond);letter-spacing:.1em;color:#C4A5FF;padding:2px 18px 6px;display:flex;align-items:center;gap:8px}
 .liveh i{width:8px;height:8px;border-radius:50%;background:#9B5CFF;box-shadow:0 0 8px #9B5CFF;animation:blink 1.4s infinite}
@@ -317,6 +328,7 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
   <div class="status" id="status">Chargement…</div>
   <div class="tools">
     <span id="clock"></span>
+    <button class="btn" id="nearBtn">📍 Autour de moi</button>
     <button class="btn" id="notifBtn">Activer les alertes</button>
     <button class="btn" id="settingsBtn">Réglages</button>
   </div>
@@ -326,6 +338,7 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
 <main>
   <section class="panel mapwrap" aria-label="Carte des incidents">
     <div class="filters" id="filters"></div>
+    <div class="nearbar" id="nearbar" hidden></div>
     <div class="mapbox">
       <div id="lmap" aria-label="Carte de France détaillée"></div>
       <div class="livebar" id="livebar"></div>
@@ -443,7 +456,43 @@ const depGroup=L.geoJSON(null,{style:()=>({color:"#3A5578",weight:1,fillColor:"#
   layer.on("mouseover",()=>layer.setStyle({weight:2,color:"#9CC8FF"}));
   layer.on("mouseout",()=>styleDeps());
 }}).addTo(map);
-const routeGroup=L.layerGroup().addTo(map), mkGroup=L.layerGroup().addTo(map), liveGroup=L.layerGroup().addTo(map);
+const routeGroup=L.layerGroup().addTo(map), mkGroup=L.layerGroup().addTo(map), liveGroup=L.layerGroup().addTo(map), nearGroup=L.layerGroup().addTo(map);
+
+/* ---------- Autour de moi ---------- */
+let near=ls.get("vf_near",null);
+const distKm=(a,b,c,d)=>{const R=6371,r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x));};
+const dOf=e=>near&&e.lat!=null?distKm(near.lat,near.lon,e.lat,e.lon):Infinity;
+const inNear=e=>!near||(e.lat!=null&&dOf(e)<=near.km+(e.area?15:0));
+const fmtKm=d=>d<1?`à ${Math.round(d*1000)} m`:`à ${d<10?d.toFixed(1).replace(".",","):Math.round(d)} km`;
+function drawNear(){
+  nearGroup.clearLayers();
+  const btn=document.getElementById("nearBtn"),bar=document.getElementById("nearbar");
+  btn.classList.toggle("on",!!near);
+  if(!near){bar.hidden=true;return;}
+  L.circle([near.lat,near.lon],{radius:near.km*1000,color:"#3DDC97",weight:1.5,dashArray:"6 6",fillColor:"#3DDC97",fillOpacity:.05,interactive:false}).addTo(nearGroup);
+  L.marker([near.lat,near.lon],{icon:L.divIcon({className:"",html:'<div class="me"></div>',iconSize:[16,16],iconAnchor:[8,8]}),title:"Ta position",zIndexOffset:3000,interactive:false}).addTo(nearGroup);
+}
+function nearBar(n){
+  const bar=document.getElementById("nearbar");if(!near){bar.hidden=true;return;}
+  bar.hidden=false;
+  bar.innerHTML=`<b>📍 ${escH(near.label||"Autour de moi")}</b><span class="km">${[5,20,50,100].map(k=>`<button data-km="${k}" aria-pressed="${near.km===k}">${k} km</button>`).join("")}</span><small>${n} fait${n>1?"s":""} dans la zone sur ${PERIODS[period]}, triés par distance</small><button class="x" id="nearCopy" title="Pour recevoir les alertes sur ton téléphone uniquement dans cette zone">Alertes téléphone</button><button class="x" id="nearOff" style="margin-left:0">Quitter</button>`;
+  document.getElementById("nearCopy").onclick=async()=>{const z=`"zone": { "lat": ${near.lat.toFixed(2)}, "lon": ${near.lon.toFixed(2)}, "km": ${near.km} }`;
+    try{await navigator.clipboard.writeText(z);toast("Copié : colle-le dans « alerts » de config.json (visible publiquement, arrondi à ~1 km)");}catch(_){prompt("Colle ceci dans « alerts » de config.json :",z);}};
+  bar.querySelectorAll("[data-km]").forEach(b=>b.onclick=()=>{near.km=+b.dataset.km;ls.set("vf_near",near);drawNear();render();fitNear();});
+  document.getElementById("nearOff").onclick=()=>{near=null;ls.set("vf_near",null);drawNear();render();map.flyToBounds(FR_BOUNDS,{duration:.6});};
+}
+function fitNear(){if(near)map.flyToBounds(L.latLng(near.lat,near.lon).toBounds(near.km*2000),{duration:.6,padding:[20,20]});}
+async function startNear(){
+  if(near){fitNear();return;}
+  const set=(lat,lon,label)=>{near={lat,lon,km:20,label};ls.set("vf_near",near);depFilter=null;drawNear();render();fitNear();toast("Zone : "+label+", 20 km");};
+  const ask=async()=>{const q=prompt("Ta ville ou ton adresse :");if(!q)return;
+    try{const r=await fetch("https://nominatim.openstreetmap.org/search?"+new URLSearchParams({q,format:"json",limit:"1",countrycodes:"fr","accept-language":"fr"}));const j=await r.json();
+      if(j[0])set(+j[0].lat,+j[0].lon,j[0].display_name.split(",")[0]);else toast("Lieu introuvable");}catch(_){toast("Recherche impossible pour l'instant");}};
+  if(!("geolocation" in navigator)) return ask();
+  toast("Localisation en cours…");
+  navigator.geolocation.getCurrentPosition(p=>set(+p.coords.latitude.toFixed(4),+p.coords.longitude.toFixed(4),"Ma position"),()=>ask(),{enableHighAccuracy:false,timeout:10000,maximumAge:600000});
+}
+document.getElementById("nearBtn").onclick=startNear;
 let zr=0;map.on("zoomend",()=>{styleDeps();clearTimeout(zr);zr=setTimeout(()=>render(),50);});
 function setDep(code){depFilter=code;closeDetail(false);render();
   if(code&&depLayers[code]) map.flyToBounds(depLayers[code].getBounds(),{padding:[30,30],duration:.6});
@@ -514,8 +563,8 @@ function drawRoutes(list){
 }
 /* ---------- Manifs prévues ---------- */
 const pWin=p=>p.hasTime?[p.start-15*60e3,(p.end&&p.end>p.start?Math.min(p.end,p.start+5*3600e3):p.start+3*3600e3)]:[p.start+864e5,p.start+864e5];
-const plannedLiveNow=(T=now())=>(DATA.planned||[]).filter(p=>{const[a,b]=pWin(p);return T>=a&&T<=b&&(!depFilter||p.dep===depFilter);});
-const plannedNext=(T=now())=>(DATA.planned||[]).filter(p=>pWin(p)[0]>T&&(!depFilter||p.dep===depFilter)).sort((a,b)=>a.start-b.start);
+const plannedLiveNow=(T=now())=>(DATA.planned||[]).filter(p=>{const[a,b]=pWin(p);return T>=a&&T<=b&&inNear(p)&&(!depFilter||p.dep===depFilter);});
+const plannedNext=(T=now())=>(DATA.planned||[]).filter(p=>pWin(p)[0]>T&&inNear(p)&&(!depFilter||p.dep===depFilter)).sort((a,b)=>a.start-b.start);
 const whenLbl=p=>{const d=new Date(p.start);const day=dayLbl(p.start)==="auj."?"Aujourd'hui":dayLbl(p.start)==="hier"?"Hier":d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});return{day:day.charAt(0).toUpperCase()+day.slice(1),time:p.hasTime?hhmm(p.start).replace(":","h"):"heure non précisée"};};
 const shortWhen=p=>{const d=new Date(p.start);const w=dayLbl(p.start)==="auj."?"AUJ":d.toLocaleDateString("fr-FR",{weekday:"short"}).replace(".","").toUpperCase();return`${w}${p.hasTime?" "+d.getHours()+"H"+(d.getMinutes()?String(d.getMinutes()).padStart(2,"0"):""):""}`;};
 const planGroup=L.layerGroup().addTo(map);
@@ -588,7 +637,10 @@ const placeLbl=e=>e.place?(e.area?e.place:`${e.place}${e.dep?" ("+e.dep+")":""}`
 const inPeriod=()=>{const T=now();return DATA.events.filter(e=>isViol(e)&&e.date<=T&&T-e.date<=period*3600e3);};
 
 function render(newIds=[]){
-  const T=now(), per=inPeriod(), sevF=per.filter(e=>active.has(e.sev)), vis=depFilter?sevF.filter(e=>e.dep===depFilter):sevF;
+  const T=now(), per=inPeriod().filter(inNear), sevF=per.filter(e=>active.has(e.sev));
+  let vis=depFilter?sevF.filter(e=>e.dep===depFilter):sevF;
+  if(near) vis=[...vis].sort((a,b)=>dOf(a)-dOf(b));
+  nearBar(vis.length);
   document.querySelectorAll("[data-n]").forEach(s=>s.textContent=per.filter(e=>e.sev===s.dataset.n&&(!depFilter||e.dep===depFilter)).length);
   const dc=document.getElementById("depChip");
   dc.innerHTML=depFilter?`<button class="chip depf" aria-pressed="true">${escH(depByCode[depFilter]?.nom||depFilter)} ×</button>`:"";
@@ -598,7 +650,7 @@ function render(newIds=[]){
   Object.keys(depByCode).forEach(c=>depByCode[c]._n=cnt[c]||0);
   styleDeps(); drawMarkers(vis);
   // en cours
-  const live=DATA.events.filter(e=>isLive(e,T)&&(!depFilter||e.dep===depFilter)).sort((a,b)=>(b.updated||b.date)-(a.updated||a.date));
+  const live=DATA.events.filter(e=>isLive(e,T)&&inNear(e)&&(!depFilter||e.dep===depFilter)).sort((a,b)=>(b.updated||b.date)-(a.updated||a.date));
   drawLive(live); buildLiveUI(live);
   document.getElementById("legend").innerHTML=(mode!=="heat"?Object.values(SEV).map(v=>`<span style="display:flex;align-items:center;gap:7px"><i style="width:9px;height:9px;border-radius:50%;background:${v.c};box-shadow:0 0 6px ${v.hex}"></i>${v.lbl}</span>`).join("")+`<span style="display:flex;align-items:center;gap:7px"><i style="width:10px;height:10px;border-radius:50%;border:2px dashed var(--muted)"></i>Département seulement</span>`:"")+(mode!=="points"?`<span style="margin-top:4px">Intensité par département</span><span style="width:130px;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--land),var(--ember),var(--crit))"></span>`:"");
   // fil
@@ -609,7 +661,7 @@ function render(newIds=[]){
     const li=document.createElement("li");li.id="f-"+e.id;
     if(selected===e.id)li.classList.add("sel");if(newIds.includes(e.id))li.classList.add("new");
     const n=e.articles.length,c=SEV[e.sev].hex;
-    li.innerHTML=`<button class="it"><span class="time">${hhmm(e.date)}<small>${dayLbl(e.date)}</small></span><span><div class="ft"><span class="dot" style="background:${c};color:${c}"></span>${escH(e.title)}</div><div class="fm">${escH(placeLbl(e))} · ${escH(e.articles[0].src)}${n>1?`<span class="badge">${n} sources</span>`:""}${e.witness?.length?`<span class="badge" style="color:#7DB8FF">+${e.witness.length} Bluesky</span>`:""}${e.versions?.conflict?`<span class="badge" style="color:#FFC857;border-color:rgba(255,200,87,.5)">⚠ versions</span>`:""}</div></span></button>`;
+    li.innerHTML=`<button class="it"><span class="time">${hhmm(e.date)}<small>${dayLbl(e.date)}</small></span><span><div class="ft"><span class="dot" style="background:${c};color:${c}"></span>${escH(e.title)}</div><div class="fm">${near&&e.lat!=null?`<span class="dist">${fmtKm(dOf(e))}</span> · `:""}${escH(placeLbl(e))} · ${escH(e.articles[0].src)}${n>1?`<span class="badge">${n} sources</span>`:""}${e.witness?.length?`<span class="badge" style="color:#7DB8FF">+${e.witness.length} Bluesky</span>`:""}${e.versions?.conflict?`<span class="badge" style="color:#FFC857;border-color:rgba(255,200,87,.5)">⚠ versions</span>`:""}</div></span></button>`;
     li.querySelector("button").onclick=()=>select(e.id);
     feed.appendChild(li);
   });
@@ -680,7 +732,7 @@ function versionsHTML(e){
 }
 function buildVersionsPanel(){
   const T=now(),g=document.getElementById("versGrid");
-  const list=DATA.events.filter(e=>e.versions?.conflict&&T-(e.updated||e.date)<48*3600e3&&(!depFilter||e.dep===depFilter)).sort((a,b)=>(b.updated||b.date)-(a.updated||a.date)).slice(0,12);
+  const list=DATA.events.filter(e=>e.versions?.conflict&&inNear(e)&&T-(e.updated||e.date)<48*3600e3&&(!depFilter||e.dep===depFilter)).sort((a,b)=>(b.updated||b.date)-(a.updated||a.date)).slice(0,12);
   document.getElementById("versCount").textContent=list.length?`${list.length} fait${list.length>1?"s":""} raconté${list.length>1?"s":""} différemment ces dernières 48 h`:"";
   if(!list.length){g.innerHTML=`<p class="mempty">Aucune divergence repérée entre médias pour l'instant : il faut au moins deux sources sur le même fait.</p>`;return;}
   g.innerHTML=list.map(e=>{const v=e.versions;const o=(v.opposed||[])[0];
@@ -753,7 +805,7 @@ function stats(vis,sevF){
   const n=k=>vis.filter(e=>e.sev===k).length, T=now();
   document.getElementById("periodLbl").textContent=PERIODS[period]+(depFilter?" · "+(depByCode[depFilter]?.nom||depFilter):"");
   document.getElementById("kpis").innerHTML=`<div class="kpi"><b style="color:var(--crit);text-shadow:0 0 18px color-mix(in srgb,var(--crit) 50%,transparent)">${n("crit")}</b><span>avec mort(s)</span></div><div class="kpi"><b style="color:var(--grave)">${n("grave")}</b><span>blessés, armes</span></div><div class="kpi"><b>${vis.length}</b><span>faits</span></div>`;
-  const base=DATA.events.filter(e=>isViol(e)&&e.date<=T&&(!depFilter||e.dep===depFilter));
+  const base=DATA.events.filter(e=>isViol(e)&&e.date<=T&&inNear(e)&&(!depFilter||e.dep===depFilter));
   const s24=base.filter(e=>T-e.date<=24*3600e3).reduce((s,e)=>s+SEV[e.sev].w,0);
   // comparaison avec la moyenne des jours précédents (jusqu'à 6 jours d'historique)
   const old=base.filter(e=>T-e.date>24*3600e3&&T-e.date<=7*864e5), oldest=old.length?Math.min(...old.map(e=>e.date)):T;
@@ -823,6 +875,7 @@ function notify(list){
   if(!alertCfg.on) return;
   const hits=list.filter(e=>{
     if(alertCfg.deps.length&&!alertCfg.deps.includes(e.dep)) return false;
+    if(near&&!inNear(e)) return false;
     if(isViol(e)&&sevRank[e.sev]>=sevRank[alertCfg.sev]) return true;
     return isLive(e)&&(alertCfg.live==="all"||(alertCfg.live==="interv"&&e.kind==="intervention"));
   });
@@ -888,6 +941,7 @@ async function loadDeps(){
 (async()=>{
   paintNotif(); buildFilters();
   try{await loadDeps();}catch(_){}
+  drawNear(); if(near) setTimeout(fitNear,300);
   await load(); tick();
   dropIds=new Set(DATA.events.filter(e=>Date.now()-e.date<24*3600e3).map(e=>e.id));render();setTimeout(()=>dropIds.clear(),1500);
   setInterval(tick,1000); setInterval(load,60e3); setInterval(()=>{if(cursor===null)render();},5*60e3);
