@@ -521,7 +521,7 @@ const shortWhen=p=>{const d=new Date(p.start);const w=dayLbl(p.start)==="auj."?"
 const planGroup=L.layerGroup().addTo(map);
 function drawPlanned(liveP,nextP){
   planGroup.clearLayers();
-  if(!showLive.planned) return;
+  if(!showLive.planned||mode==="heat") return;
   const T=now();
   nextP.filter(p=>p.lat!=null&&p.start-T<7*864e5).forEach(p=>{
     L.marker([p.lat,p.lon],{icon:L.divIcon({className:"",html:`<div class="pl${map.getZoom()<7?" small":""}"><b></b><span>${escH(shortWhen(p))}</span></div>`,iconSize:null,iconAnchor:[0,0]}),title:`Prévue · ${p.title}`,zIndexOffset:100,keyboard:true}).on("click",()=>select(p.id)).addTo(planGroup);
@@ -531,7 +531,7 @@ function drawPlanned(liveP,nextP){
   });
 }
 function drawLive(list){
-  liveGroup.clearLayers(); drawRoutes(list);
+  liveGroup.clearLayers(); if(mode==="heat"){routeGroup.clearLayers();return;} drawRoutes(list);
   list.filter(hasPos).filter(e=>showLive[e.kind]).forEach(e=>{
     const k=KIND[e.kind];
     const html=`<div class="lv lv-${e.kind==="manif"?"manif":"interv"}${selected===e.id?" sel":""}${map.getZoom()<8&&e.kind==="manif"&&selected!==e.id?" small":""}"><b>${e.kind==="manif"?"✊":""}</b><span>${e.ongoing?"EN COURS · ":""}${k.lbl.toUpperCase()}${orgTxt(e)?" · "+escH(orgTxt(e)):""}</span></div>`;
