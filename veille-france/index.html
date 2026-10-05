@@ -452,7 +452,7 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
 <script>
 const SEV={crit:{lbl:"Mort(s)",w:3,c:"var(--crit)",hex:"#FF3B4E"},grave:{lbl:"Blessés graves",w:2,c:"var(--grave)",hex:"#FF9F1C"},eleve:{lbl:"Violences",w:1,c:"var(--eleve)",hex:"#4DA3FF"}};
 const KIND={manif:{lbl:"Manif",long:"Manifestation",hex:"#9B5CFF",win:3},intervention:{lbl:"Intervention",long:"Intervention en cours",hex:"#0E7490",win:2}};
-const PERIODS={6:"6 h",24:"24 h",48:"48 h",168:"7 jours"};
+const PERIODS={1:"1 h",3:"3 h",6:"6 h",24:"24 h",48:"48 h",168:"7 jours"};
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
 let DATA={events:[],feeds:[],updated:null}, depByCode={}, depLayers={};
