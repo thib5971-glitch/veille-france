@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0B1320">
 <title>Veille France – salle de crise</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚨</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><path d='M32 4 56 18v28L32 60 8 46V18Z' fill='%23131F31' stroke='%23E9EFF6' stroke-width='4' stroke-linejoin='round'/><circle cx='32' cy='32' r='9' fill='%23FF3B4E'/><circle cx='42' cy='22' r='4' fill='%23FF9F1C'/><circle cx='22' cy='43' r='4' fill='%234DA3FF'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -44,6 +44,13 @@ button{font-family:inherit}
 header{display:grid;grid-template-columns:auto 1fr auto;gap:12px 24px;align-items:center;padding:18px 24px 14px}
 @media (max-width:860px){header{grid-template-columns:1fr}}
 h1{margin:0;font-family:var(--cond);font-weight:800;font-size:clamp(28px,3.6vw,42px);line-height:.95;letter-spacing:.01em;text-transform:uppercase}
+h1.brand{display:flex;align-items:center;gap:14px}
+.logo{width:clamp(44px,4.6vw,58px);height:auto;flex:none;filter:drop-shadow(0 0 10px rgba(255,59,78,.35))}
+.logo .sweep{transform-origin:32px 32px;animation:sweep 4s linear infinite}
+.logo .ping{transform-origin:32px 32px;animation:lping 2s ease-out infinite}
+@keyframes sweep{to{transform:rotate(-360deg)}}
+@keyframes lping{from{transform:scale(1);opacity:.9}to{transform:scale(3.2);opacity:0}}
+@media (prefers-reduced-motion:reduce){.logo .sweep,.logo .ping{animation:none}.logo .ping{opacity:0}}
 h1 small{display:block;font-family:var(--body);font-weight:500;font-size:13px;letter-spacing:0;text-transform:none;color:var(--muted);margin-top:6px}
 .status{font-size:13.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}
 .status b{color:var(--ink);font-weight:600}
@@ -324,7 +331,22 @@ footer{padding:18px 24px 26px;font-size:12.5px;color:var(--muted);max-width:900p
 </div>
 
 <header>
-  <h1>Veille France<small>Incidents graves, manifestations et interventions en direct</small></h1>
+  <h1 class="brand"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <linearGradient id="lgSweep" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FF3B4E" stop-opacity="0"/><stop offset="1" stop-color="#FF3B4E" stop-opacity=".55"/></linearGradient>
+        <clipPath id="lgHex"><path d="M32 4 56 18v28L32 60 8 46V18Z"/></clipPath>
+      </defs>
+      <path d="M32 4 56 18v28L32 60 8 46V18Z" fill="#131F31" stroke="#E9EFF6" stroke-width="3" stroke-linejoin="round"/>
+      <g clip-path="url(#lgHex)">
+        <circle cx="32" cy="32" r="12" fill="none" stroke="#2C4361" stroke-width="1.5"/>
+        <circle cx="32" cy="32" r="21" fill="none" stroke="#2C4361" stroke-width="1.5"/>
+        <g class="sweep"><path d="M32 32 L58 32 A26 26 0 0 0 50.4 13.6 Z" fill="url(#lgSweep)"/></g>
+      </g>
+      <circle cx="40" cy="24" r="3" fill="#FF9F1C"/>
+      <circle cx="24" cy="42" r="2.5" fill="#4DA3FF"/>
+      <circle cx="32" cy="32" r="5" fill="#FF3B4E"/>
+      <circle class="ping" cx="32" cy="32" r="5" fill="none" stroke="#FF3B4E" stroke-width="2"/>
+    </svg><span>Veille France<small>Incidents graves, manifestations et interventions en direct</small></span></h1>
   <div class="status" id="status">Chargement…</div>
   <div class="tools">
     <span id="clock"></span>
